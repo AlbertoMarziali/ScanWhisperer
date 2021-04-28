@@ -1,7 +1,7 @@
 ScanWhisperer
 ===============
 
-ScanWhisperer is a vulnerability management tool and report aggregator. ScanWhisperer will pull all the reports from the different Vulnerability scanners and create a file with a unique filename for each one, using that data later to feed Logstash. Logstash indexes and tags all of the information inside the report (see logstash files at /elk/pipeline/). Data is then shipped to ElasticSearch to be indexed, and ends up in a visual and searchable format in Kibana with already defined dashboards.
+ScanWhisperer is a vulnerability management tool and report aggregator. ScanWhisperer will pull all the reports from the different Vulnerability scanners and create a file with a unique filename for each one, using that data later to feed Logstash. Logstash indexes and tags all of the information inside the report (see logstash files at /elk/). Data is then shipped to ElasticSearch to be indexed, and ends up in a visual and searchable format in Kibana with already defined dashboards.
 
 This is a custom version of VulnWhisperer. You can find the original one <a href="https://github.com/HASecuritySolutions/VulnWhisperer">here</a>.
 
@@ -32,7 +32,7 @@ Getting Started
 
 1) Follow the [install requirements](#installreq)
 2) Fill out the section you want to process in <a href="https://github.com/AlbertoMarziali/ScanWhisperer/blob/main/configs/frameworks.ini">frameworks.ini file</a>
-3) [ELK] Modify the IP settings in the <a href="https://github.com/AlbertoMarziali/ScanWhisperer/elk/pipeline">Logstash files to accommodate your environment</a> and import them to your logstash conf directory (default is /etc/logstash/conf.d/)
+3) [ELK] Modify the IP settings in the <a href="https://github.com/AlbertoMarziali/ScanWhisperer/elk/">Logstash files to accommodate your environment</a> and import them to your logstash conf directory (default is /etc/logstash/conf.d/)
 4) [Run Scanwhisperer](#run)
 
 Requirements
