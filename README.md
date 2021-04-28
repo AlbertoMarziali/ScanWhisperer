@@ -31,7 +31,7 @@ Getting Started
 ===============
 
 1) Follow the [install requirements](#installreq)
-2) Fill out the section you want to process in <a href="https://github.com/AlbertoMarziali/ScanWhisperer/blob/configs/frameworks.ini">frameworks.ini file</a>
+2) Fill out the section you want to process in <a href="https://github.com/AlbertoMarziali/ScanWhisperer/blob/main/configs/frameworks.ini">frameworks.ini file</a>
 3) [ELK] Modify the IP settings in the <a href="https://github.com/AlbertoMarziali/ScanWhisperer/elk/pipeline">Logstash files to accommodate your environment</a> and import them to your logstash conf directory (default is /etc/logstash/conf.d/)
 4) [Run Scanwhisperer](#run)
 
