@@ -81,7 +81,7 @@ There are a few configuration steps to setting up ScanWhisperer:
 *   Configure Ini file
 *   Setup Logstash File
 
-<a href="https://github.com/AlbertoMarziali/ScanWhisperer/blob/configs/frameworks.ini">frameworks.ini file</a>
+<a href="https://github.com/AlbertoMarziali/ScanWhisperer/blob/main/configs/frameworks.ini">frameworks.ini file</a>
 
 <a id="run">Run</a>
 -----
