@@ -1,0 +1,13 @@
+pandas
+setuptools
+pytz
+Requests
+lxml
+future-fstrings
+bs4
+jira
+bottle
+coloredlogs
+qualysapi
+httpretty
+boto3

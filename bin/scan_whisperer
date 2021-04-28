@@ -1,0 +1,113 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+__author__ = 'Austin Taylor'
+
+
+from scanwhisp.scanwhisp import scanWhisperer
+from scanwhisp.base.config import swConfig
+import os
+import argparse
+import sys
+import logging
+
+
+def isFileValid(parser, arg):
+    if not os.path.exists(arg):
+        parser.error("The file %s does not exist!" % arg)
+    else:
+        return arg
+
+
+def main():
+
+    parser = argparse.ArgumentParser(description=""" ScanWhisperer is designed to create actionable data from\
+     your vulnerability scans through aggregation of historical scans.""")
+    parser.add_argument('-c', '--config', dest='config', required=False, default='frameworks.ini',
+                        help='Path of config file', type=lambda x: isFileValid(parser, x.strip()))
+    parser.add_argument('-s', '--section', dest='section', required=False,
+                        help='Section in config')
+    parser.add_argument('-p', '--purge', dest='purge', action='store_true', default=False,
+                        help='Purge the DB')
+    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False,
+                        help='Enable detailed logging')
+    parser.add_argument('-F', '--fancy', action='store_true',
+                        help='Enable colourful logging output')
+    parser.add_argument('-l', '--log', dest='logfile', required=False,
+                        help='Path of log file')
+    args = parser.parse_args()
+
+    # First setup logging
+    logging.basicConfig(
+        stream=sys.stdout,
+        #format only applies when not using -F flag for colouring
+        format='%(levelname)s:%(name)s:%(funcName)s %(message)s' if args.verbose else '%(levelname)s:%(name)s %(message)s',
+        level=logging.INFO
+    )
+    if args.logfile:
+        logger = logging.getLogger()
+        # we set up the logger to log as well to file
+        fh = logging.FileHandler(args.logfile)
+        fh.setLevel(logging.INFO)
+        fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(funcName)s:%(message)s", "%Y-%m-%d %H:%M:%S"))
+        logger.addHandler(fh)
+
+    if args.fancy:
+        import coloredlogs
+        coloredlogs.install(level='INFO')
+
+    exit_code = 0
+
+    # Intro
+    logger.info('+-+-+-+-+-+-+-+-+-+-+-+-+-+')
+    logger.info('|S|c|a|n|W|h|i|s|p|e|r|e|r|')
+    logger.info('+-+-+-+-+-+-+-+-+-+-+-+-+-+')
+    logger.info('Dev: Alberto Marziali')
+    logger.info('Git: https://github.com/AlbertoMarziali/ScanWhisperer')
+    logger.info('')
+
+    try:
+        if args.config and not args.section:
+            # this remains a print since we are in the main binary
+            logger.info('No section was specified, scanwhisperer will scrape enabled modules from the config file.')
+            
+            config = swConfig(config_in=args.config)
+            enabled_sections = config.get_sections_with_attribute('enabled')
+
+            for section in enabled_sections:
+                try:
+                    sw = scanWhisperer(config=args.config,
+                                       profile=section,
+                                       verbose=args.verbose,
+                                       purge=args.purge)
+                    exit_code += sw.whisper_vulnerabilities()
+                except Exception as e:
+                    logger.error("ScanWhisperer was unable to perform the processing on '{}': {}".format(section, e))
+        else:
+            logger.info('Running ScanWhisperer for section {}'.format(args.section))
+            sw = scanWhisperer(config=args.config,
+                               profile=args.section,
+                               verbose=args.verbose,
+                               purge=args.purge)
+            exit_code += sw.whisper_vulnerabilities()
+
+        close_logging_handlers(logger)
+        sys.exit(exit_code)
+
+    except Exception as e:
+        if args.verbose:
+            # this will remain a print since we are in the main binary
+            logger.error('{}'.format(str(e)))
+            print('ERROR: {error}'.format(error=e))
+        # TODO: fix this to NOT be exit 2 unless in error
+        close_logging_handlers(logger)
+        sys.exit(2)
+
+    close_logging_handlers(logger)
+
+def close_logging_handlers(logger):
+    for handler in logger.handlers:
+        handler.close()
+        logger.removeFilter(handler)
+
+if __name__ == '__main__':
+    main()
