@@ -126,17 +126,17 @@ class scanWhispererAWSInspector(scanWhispererBase):
         # return the dataframe
         return {    'Agent ID' : df_agentId,
                     'Public IP': df_publicIp,
-                    'Tag': self.cleanser(df_tagName),
+                    'Tag': df_tagName,
                     'CVSS3 Score': df_cvss3_score,
                     'CVSS2 Score': df_cvss2_score,
-                    'CVSS2 Severity': self.cleanser(df_cvss2),
-                    'CVE': self.cleanser(df_cve_id),
-                    'Package Name': self.cleanser(df_pkg_name),
-                    'Title': self.cleanser(df_title),
-                    'Description': self.cleanser(df_description),
-                    'Recommendation' : self.cleanser(df_recommendation),
+                    'CVSS2 Severity': df_cvss2,
+                    'CVE': df_cve_id,
+                    'Package Name': df_pkg_name,
+                    'Title': df_title,
+                    'Description': df_description,
+                    'Recommendation' : df_recommendation,
                     'Scan ARN' : df_scanArn,
-                    'Scan Name' : self.cleanser(df_scanName),
+                    'Scan Name' : df_scanName,
                     'Last Seen' : df_last_seen
                 }
 
@@ -165,6 +165,13 @@ class scanWhispererAWSInspector(scanWhispererBase):
                             output_csv = output_csv.append(self.create_report(scan, finding), ignore_index=True)
                         except:
                             self.logger.warn('AWS Inspector finding fetch error (missing agentId?)')   
+
+                    # cleanse the Output csv
+                    columns_to_cleanse = ['Tag', 'CVSS2 Severity', 'CVE', 'Package Name', 'Title', 'Description', 'Recommendation', 'Scan Name']
+
+                    for col in columns_to_cleanse:
+                        if col in output_csv:
+                            output_csv[col] = output_csv[col].astype(str).apply(self.cleanser)
 
                     # save the output csv of the scan
                     file_name = 'AWS_Inspector_%s.csv' % (time.time())
