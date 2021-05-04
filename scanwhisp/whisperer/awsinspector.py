@@ -171,7 +171,7 @@ class scanWhispererAWSInspector(scanWhispererBase):
 
                     for col in columns_to_cleanse:
                         if col in output_csv:
-                            output_csv[col] = output_csv[col].astype(str).apply(self.cleanser)
+                            output_csv[col] = output_csv[col].strip().astype(str).apply(self.cleanser)
 
                     # save the output csv of the scan
                     file_name = 'AWS_Inspector_%s.csv' % (time.time())
