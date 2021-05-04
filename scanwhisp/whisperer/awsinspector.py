@@ -106,21 +106,22 @@ class scanWhispererAWSInspector(scanWhispererBase):
         df_scanName = scan.get('name', '')
         df_last_seen = finding.get('updatedAt', datetime.now()).timestamp()
 
-        # calculate the correct cvss2 string score
+        # calculate the correct cvss2 string score (only if present)
         df_cvss2 = ''
-        try:
-            if(float(df_cvss2_score) == 0):
-                df_cvss2 = 'Info'
-            elif (float(df_cvss2_score) <= 3.9):
-                df_cvss2 = 'Low'
-            elif (float(df_cvss2_score) <= 6.9):
-                df_cvss2 = 'Medium'
-            elif (float(df_cvss2_score) <= 9.9):
-                df_cvss2 = 'High'
-            elif (float(df_cvss2_score) == 10):
-                df_cvss2 = 'Critical'
-        except ValueError:  
-            print ("Not a float")
+        if df_cvss2_score is not '':
+            try:
+                if(float(df_cvss2_score) == 0):
+                    df_cvss2 = 'Info'
+                elif (float(df_cvss2_score) <= 3.9):
+                    df_cvss2 = 'Low'
+                elif (float(df_cvss2_score) <= 6.9):
+                    df_cvss2 = 'Medium'
+                elif (float(df_cvss2_score) <= 9.9):
+                    df_cvss2 = 'High'
+                elif (float(df_cvss2_score) == 10):
+                    df_cvss2 = 'Critical'
+            except ValueError:  
+                print ("Not a float")
 
         # return the dataframe
         return {    'Agent ID' : df_agentId,
