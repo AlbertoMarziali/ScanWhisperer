@@ -124,7 +124,7 @@ class scanWhispererBase(object):
         self.create_table()
 
     def cleanser(self, _data):
-        repls = (('\n', r'\n'), ('\r', r'\r'))
+        repls = (('\n', r'\n'), ('\r', r'\r'), ('\t', r''))
         data = reduce(lambda a, kv: a.replace(*kv), repls, _data)
         return data
 
