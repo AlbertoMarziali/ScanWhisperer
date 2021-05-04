@@ -126,17 +126,17 @@ class scanWhispererAWSInspector(scanWhispererBase):
         # return the dataframe
         return {    'Agent ID' : df_agentId,
                     'Public IP': df_publicIp,
-                    'Tag': df_tagName.strip(),
+                    'Tag': df_tagName.strip().replace('\t', ''),
                     'CVSS3 Score': df_cvss3_score,
                     'CVSS2 Score': df_cvss2_score,
-                    'CVSS2 Severity': df_cvss2.strip(),
-                    'CVE': df_cve_id.strip(),
-                    'Package Name': df_pkg_name.strip(),
-                    'Title': df_title.strip(),
-                    'Description': df_description.strip(),
-                    'Recommendation' : df_recommendation.strip(),
+                    'CVSS2 Severity': df_cvss2.strip().replace('\t', ''),
+                    'CVE': df_cve_id.strip().replace('\t', ''),
+                    'Package Name': df_pkg_name.strip().replace('\t', ''),
+                    'Title': df_title.strip().replace('\t', ''),
+                    'Description': df_description.strip().replace('\t', ''),
+                    'Recommendation' : df_recommendation.strip().replace('\t', ''),
                     'Scan ARN' : df_scanArn,
-                    'Scan Name' : df_scanName.strip(),
+                    'Scan Name' : df_scanName.strip().replace('\t', ''),
                     'Last Seen' : df_last_seen
                 }
 
