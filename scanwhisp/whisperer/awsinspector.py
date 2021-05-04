@@ -126,17 +126,17 @@ class scanWhispererAWSInspector(scanWhispererBase):
         # return the dataframe
         return {    'Agent ID' : df_agentId,
                     'Public IP': df_publicIp,
-                    'Tag': df_tagName,
+                    'Tag': df_tagName.strip(),
                     'CVSS3 Score': df_cvss3_score,
                     'CVSS2 Score': df_cvss2_score,
-                    'CVSS2 Severity': df_cvss2,
-                    'CVE': df_cve_id,
-                    'Package Name': df_pkg_name,
-                    'Title': df_title,
-                    'Description': df_description,
-                    'Recommendation' : df_recommendation,
+                    'CVSS2 Severity': df_cvss2.strip(),
+                    'CVE': df_cve_id.strip(),
+                    'Package Name': df_pkg_name.strip(),
+                    'Title': df_title.strip(),
+                    'Description': df_description.strip(),
+                    'Recommendation' : df_recommendation.strip(),
                     'Scan ARN' : df_scanArn,
-                    'Scan Name' : df_scanName,
+                    'Scan Name' : df_scanName.strip(),
                     'Last Seen' : df_last_seen
                 }
 
@@ -171,7 +171,7 @@ class scanWhispererAWSInspector(scanWhispererBase):
 
                     for col in columns_to_cleanse:
                         if col in output_csv:
-                            output_csv[col] = output_csv[col].astype(str).strip().apply(self.cleanser)
+                            output_csv[col] = output_csv[col].astype(str).apply(self.cleanser)
 
                     # save the output csv of the scan
                     file_name = 'AWS_Inspector_%s.csv' % (time.time())
