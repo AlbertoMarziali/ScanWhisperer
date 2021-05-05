@@ -18,6 +18,9 @@ class AWSInspectorAPI(object):
             raise Exception('ERROR: Region or API keys.')
 
         self.verbose = verbose
+                
+        # setup cache dict for rule packages names
+        self.rulepackagecache = {}
 
         self.inspector = boto3.client(
             'inspector',
@@ -56,7 +59,7 @@ class AWSInspectorAPI(object):
         return scan_arns
 
 
-    def get_scan_findings(self, scan_arn=None):
+    def get_scan_findings(self, scan_arn):
         
         paginator = self.inspector.get_paginator('list_findings')
         results = []
@@ -77,3 +80,28 @@ class AWSInspectorAPI(object):
                 results.extend(response_d['findings'])
 
         return results
+
+
+    def get_rule_name(self, rule_arn):
+        ret = ''
+        # try to find the rule_arn inside local cache
+        if self.rulepackagecache.get(rule_arn):
+            ret = self.rulepackagecache.get(rule_arn)
+        else:
+            # if never cached, fetch rule name via API
+            try:
+                response = self.inspector.describe_rules_packages(
+                    rulesPackageArns=[
+                        rule_arn,
+                    ]
+                )
+
+                ret = response['rulesPackages'][0]['name']
+            except Exception as e:
+                ret = 'Unknown'
+                print(e)
+
+            # save in cache, even if failed
+            self.rulepackagecache[rule_arn] = ret
+        
+        return ret

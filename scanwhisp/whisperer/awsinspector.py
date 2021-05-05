@@ -104,6 +104,8 @@ class scanWhispererAWSInspector(scanWhispererBase):
         df_recommendation = finding.get('recommendation', '')
         df_scanArn = scan['arn']
         df_scanName = scan.get('name', '')
+        df_ruleArn = finding.get('serviceAttributes').get('rulesPackageArn')
+        df_ruleName = self.awsinspector.get_rule_name(finding.get('serviceAttributes').get('rulesPackageArn'))
         df_last_seen = finding.get('updatedAt', datetime.now()).timestamp()
 
         # calculate the correct cvss2 string score (only if present)
@@ -137,6 +139,8 @@ class scanWhispererAWSInspector(scanWhispererBase):
                     'Recommendation' : df_recommendation.strip().replace('\t', ''),
                     'Scan ARN' : df_scanArn,
                     'Scan Name' : df_scanName.strip().replace('\t', ''),
+                    'Rules Package ARN' : df_ruleArn,
+                    'Rules Package Name': df_ruleName.strip().replace('\t', ''),
                     'Last Seen' : df_last_seen
                 }
 
@@ -167,7 +171,7 @@ class scanWhispererAWSInspector(scanWhispererBase):
                             self.logger.warn('AWS Inspector finding fetch error (missing agentId?)')   
 
                     # cleanse the Output csv
-                    columns_to_cleanse = ['Tag', 'CVSS2 Severity', 'CVE', 'Package Name', 'Title', 'Description', 'Recommendation', 'Scan Name']
+                    columns_to_cleanse = ['Tag', 'CVSS2 Severity', 'CVE', 'Package Name', 'Title', 'Description', 'Recommendation', 'Scan Name', 'Rule Package Name']
 
                     for col in columns_to_cleanse:
                         if col in output_csv:
