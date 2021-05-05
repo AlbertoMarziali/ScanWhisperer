@@ -21,6 +21,7 @@ import json
 import logging
 import socket
 from datetime import datetime
+import re
 
 
 class scanWhispererAWSInspector(scanWhispererBase):
@@ -89,16 +90,12 @@ class scanWhispererAWSInspector(scanWhispererBase):
 
         return scans_to_process
 
-    # This function creates a single CSV output file row
-    def create_report(self, scan, finding):
-        # extract the correct fields. Everyone is optional except for agentId and scanId. If not found, it'll trow an exception
+
+    def create_report_common(self, scan, finding):
+        # extract the common fields. Everyone is optional except for agentId and scanId. If not found, it'll trow an exception
         df_agentId = finding['assetAttributes']['agentId']
         df_publicIp = next((item.get('publicIp', '') for item in finding['assetAttributes']['networkInterfaces'] if item.get('publicIp') != ''), '')
         df_tagName = next((item.get('value', '') for item in finding['assetAttributes']['tags'] if item.get('key') == 'Name'), '')
-        df_cvss3_score = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CVSS3_SCORE'), '')
-        df_cvss2_score = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CVSS2_SCORE'), '')
-        df_cve_id = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CVE_ID'), '')
-        df_pkg_name = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'package_name'), '')
         df_title = finding.get('title', '')
         df_description = finding.get('description', '')
         df_recommendation = finding.get('recommendation', '')
@@ -108,6 +105,27 @@ class scanWhispererAWSInspector(scanWhispererBase):
         df_ruleName = self.awsinspector.get_rule_name(finding.get('serviceAttributes').get('rulesPackageArn'))
         df_last_seen = finding.get('updatedAt', datetime.now()).timestamp()
 
+        return {    'Agent ID' : self.cleanser(df_agentId),
+                    'Public IP': self.cleanser(df_publicIp),
+                    'Tag': self.cleanser(df_tagName.strip().replace('\t', '')),
+                    'Title': self.cleanser(df_title.strip().replace('\t', '')),
+                    'Description': self.cleanser(df_description.strip().replace('\t', '')),
+                    'Recommendation' : self.cleanser(df_recommendation.strip().replace('\t', '')),
+                    'Scan ARN' : self.cleanser(df_scanArn),
+                    'Scan Name' : self.cleanser(df_scanName.strip().replace('\t', '')),
+                    'Rules Package ARN' : self.cleanser(df_ruleArn),
+                    'Rules Package Name': self.cleanser(df_ruleName.strip().replace('\t', '')),
+                    'Last Seen' : df_last_seen
+                }
+
+
+    def create_report_cve(self, scan, finding):
+        # extract CVE related fields (if present)
+        df_cvss3_score = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CVSS3_SCORE'), '')
+        df_cvss2_score = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CVSS2_SCORE'), '')
+        df_cve_id = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CVE_ID'), '')
+        df_pkg_name = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'package_name'), '')
+        
         # calculate the correct cvss2 string score (only if present)
         df_cvss2 = ''
         if df_cvss2_score is not '':
@@ -125,24 +143,45 @@ class scanWhispererAWSInspector(scanWhispererBase):
             except ValueError:  
                 print ("Not a float")
 
-        # return the dataframe
-        return {    'Agent ID' : df_agentId,
-                    'Public IP': df_publicIp,
-                    'Tag': df_tagName.strip().replace('\t', ''),
-                    'CVSS3 Score': df_cvss3_score,
+        return {    'CVSS3 Score': df_cvss3_score,
                     'CVSS2 Score': df_cvss2_score,
-                    'CVSS2 Severity': df_cvss2.strip().replace('\t', ''),
-                    'CVE': df_cve_id.strip().replace('\t', ''),
-                    'Package Name': df_pkg_name.strip().replace('\t', ''),
-                    'Title': df_title.strip().replace('\t', ''),
-                    'Description': df_description.strip().replace('\t', ''),
-                    'Recommendation' : df_recommendation.strip().replace('\t', ''),
-                    'Scan ARN' : df_scanArn,
-                    'Scan Name' : df_scanName.strip().replace('\t', ''),
-                    'Rules Package ARN' : df_ruleArn,
-                    'Rules Package Name': df_ruleName.strip().replace('\t', ''),
-                    'Last Seen' : df_last_seen
+                    'CVSS2 Severity': self.cleanser(df_cvss2.strip().replace('\t', '')),
+                    'CVE': self.cleanser(df_cve_id.strip().replace('\t', '')),                   
+                    'Package Name': self.cleanser(df_pkg_name.strip().replace('\t', '')),
                 }
+
+
+    def create_report_cis(self, scan, finding):
+        # extract CIS related fields (if present)
+        df_cis_control = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'BENCHMARK_RULE_ID'), '')
+        df_cis_benchmark = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'BENCHMARK_ID'), '')
+        df_cis_level = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CIS_BENCHMARK_PROFILE'), '')
+        
+        df_cis_severity = ''
+        if df_cis_control is not '':
+            df_cis_severity = finding.get('severity', '')
+
+        return {    'CIS Control': self.cleanser(df_cis_control.replace('\t', '')),
+                    'CIS Benchmark': self.cleanser(df_cis_benchmark.replace('\t', '')),
+                    'CIS Level': self.cleanser(df_cis_level.replace('\t', '')),
+                    'CIS Severity': self.cleanser(df_cis_severity),
+                }     
+        
+
+    # This function creates a single CSV output file row
+    def create_report(self, scan, finding):
+        # assemble report
+        report = {}
+
+        # Common part
+        report.update(self.create_report_common(scan, finding))
+
+        # Attributes part
+        report.update(self.create_report_cve(scan, finding))
+        report.update(self.create_report_cis(scan, finding))
+
+        return report
+
 
     def whisper_awsinspector(self):
         if self.awsinspector_connect:
@@ -167,15 +206,8 @@ class scanWhispererAWSInspector(scanWhispererBase):
                         # parse the finding and add the row to output_csv
                         try:
                             output_csv = output_csv.append(self.create_report(scan, finding), ignore_index=True)
-                        except:
-                            self.logger.warn('AWS Inspector finding fetch error (missing agentId?)')   
-
-                    # cleanse the Output csv
-                    columns_to_cleanse = ['Tag', 'CVSS2 Severity', 'CVE', 'Package Name', 'Title', 'Description', 'Recommendation', 'Scan Name', 'Rule Package Name']
-
-                    for col in columns_to_cleanse:
-                        if col in output_csv:
-                            output_csv[col] = output_csv[col].astype(str).apply(self.cleanser)
+                        except Exception as e:
+                            self.logger.warn('AWS Inspector finding fetch error: {}'.format(e))   
 
                     # save the output csv of the scan
                     file_name = 'AWS_Inspector_%s.csv' % (time.time())
