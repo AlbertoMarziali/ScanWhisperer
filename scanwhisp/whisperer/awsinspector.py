@@ -23,6 +23,11 @@ import socket
 from datetime import datetime
 import re
 
+import hashlib
+from elasticsearch import Elasticsearch
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 class scanWhispererAWSInspector(scanWhispererBase):
     CONFIG_SECTION = None
@@ -52,13 +57,19 @@ class scanWhispererAWSInspector(scanWhispererBase):
         # if the config is available
         if config is not None:
             try:
-                # fetch API keys from config file
+                # fetch data from config file
+                # AWS Inspector
                 self.access_key = self.config.get(self.CONFIG_SECTION, 'access_key')
                 self.secret_key = self.config.get(self.CONFIG_SECTION, 'secret_key')
                 self.region_name = self.config.get(self.CONFIG_SECTION, 'region_name')
 
+                # Elastic Search
+                self.elk_host = self.config.get(self.CONFIG_SECTION, 'elk_host')
+                self.elk_username = self.config.get(self.CONFIG_SECTION, 'elk_username')
+                self.elk_password = self.config.get(self.CONFIG_SECTION, 'elk_password')
+
+                # try to connect to AWS Inspector
                 try:
-                    # try to connect to AWS Inspector
                     self.logger.info('Attempting to connect to {}...'.format(self.CONFIG_SECTION))
                     self.awsinspector = \
                         AWSInspectorAPI(region_name=self.region_name,
@@ -68,11 +79,27 @@ class scanWhispererAWSInspector(scanWhispererBase):
                     self.awsinspector_connect = True
                     self.logger.info('Connected to {}'.format(self.CONFIG_SECTION))
 
+                    # try to connect to Elastic Search
+                    try:
+                        # disable Elastic Search logger
+                        logging.getLogger('elasticsearch').setLevel(logging.CRITICAL)
+
+                        # connect to Elastic Search
+                        self.logger.info('Attempting to connect to Elastic Search ({})'.format(self.elk_host))
+                        self.elastic_client= Elasticsearch('https://{}:{}@{}'.format(self.elk_username, self.elk_password, self.elk_host), ca_certs=False, verify_certs=False)
+                        self.elk_connect = True
+                        self.logger.info('Connected to Elastic Search ({})'.format(self.elk_host))
+
+                    except Exception as e:
+                        self.logger.error('Could not connect to Elastic Search ({})'.format(self.elk_host))
+
                 except Exception as e:
                     self.logger.error('Could not connect to {}: {}'.format(self.CONFIG_SECTION, e))
+               
 
             except Exception as e:
                 self.logger.error('Could not properly load your config: {}'.format(e))
+
 
     # This function return the list of scan to process (scan listed by api - scan already imported)
     def get_scans_to_process(self, latest_scans):
@@ -91,42 +118,75 @@ class scanWhispererAWSInspector(scanWhispererBase):
         return scans_to_process
 
 
-    def create_report_common(self, scan, finding):
-        # extract the common fields. Everyone is optional except for agentId and scanId. If not found, it'll trow an exception
-        df_agentId = finding['assetAttributes']['agentId']
-        df_publicIp = next((item.get('publicIp', '') for item in finding['assetAttributes']['networkInterfaces'] if item.get('publicIp') != ''), '')
-        df_tagName = next((item.get('value', '') for item in finding['assetAttributes']['tags'] if item.get('key') == 'Name'), '')
-        df_title = finding.get('title', '')
-        df_description = finding.get('description', '')
-        df_recommendation = finding.get('recommendation', '')
+    # This function creates a single report
+    def create_report(self, scan, finding):
+        # assemble report
+        report = {}
+
+        # ---- Scan data part ----
+        report.update({ 'tags': 'awsinspector' })
+
         df_scanArn = scan['arn']
+        report.update({ 'scan_arn' : df_scanArn.strip() })
+
         df_scanName = scan.get('name', '')
+        report.update({ 'scan_name' : df_scanName.strip() })
+
         df_ruleArn = finding.get('serviceAttributes').get('rulesPackageArn')
+        report.update({ 'rules_package_arn' : df_ruleArn.strip() })
+
         df_ruleName = self.awsinspector.get_rule_name(finding.get('serviceAttributes').get('rulesPackageArn'))
-        df_last_seen = finding.get('updatedAt', datetime.now()).timestamp()
+        report.update({ 'rules_package_name': df_ruleName.strip() })
 
-        return {    'Agent ID' : self.cleanser(df_agentId),
-                    'Public IP': self.cleanser(df_publicIp),
-                    'Tag': self.cleanser(df_tagName.strip().replace('\t', '')),
-                    'Title': self.cleanser(df_title.strip().replace('\t', '')),
-                    'Description': self.cleanser(df_description.strip().replace('\t', '')),
-                    'Recommendation' : self.cleanser(df_recommendation.strip().replace('\t', '')),
-                    'Scan ARN' : self.cleanser(df_scanArn),
-                    'Scan Name' : self.cleanser(df_scanName.strip().replace('\t', '')),
-                    'Rules Package ARN' : self.cleanser(df_ruleArn),
-                    'Rules Package Name': self.cleanser(df_ruleName.strip().replace('\t', '')),
-                    'Last Seen' : df_last_seen
-                }
+        # ---- Time part ----
+        df_first_observed = finding.get('updatedAt', datetime.now()).isoformat()
+        report.update({ 'first_observed': df_first_observed })
 
+        df_last_observed = finding.get('updatedAt', datetime.now()).isoformat()
+        report.update({ 'last_observed': df_last_observed  })
 
-    def create_report_cve(self, scan, finding):
+        # ---- Finding Common part ----
+        df_agentId = finding['assetAttributes']['agentId']
+        report.update({ 'asset': df_agentId.strip() })
+
+        df_publicIp = next((item.get('publicIp', '') for item in finding['assetAttributes']['networkInterfaces'] if item.get('publicIp') != ''), '')
+        if df_publicIp is not '':
+            report.update({ 'ip': df_publicIp.strip() })
+
+        df_tagName = next((item.get('value', '') for item in finding['assetAttributes']['tags'] if item.get('key') == 'Name'), '')
+        if df_tagName is not '':
+            report.update({ 'tag': df_tagName.strip() })
+
+        df_title = finding.get('title', '')
+        if df_title is not '':
+            report.update({ 'title': df_title.strip() })
+
+        df_description = finding.get('description', '')
+        if df_description is not '':
+            report.update({ 'description': df_description.strip() })
+
+        df_recommendation = finding.get('recommendation', '')
+        if df_recommendation is not '':
+            report.update({ 'solution' : df_recommendation.strip() })
+
+        # ---- CVE part ----
         # extract CVE related fields (if present)
         df_cvss3_score = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CVSS3_SCORE'), '')
+        if df_cvss3_score is not '':
+             report.update({ 'cvss3_score': df_cvss3_score })
+
         df_cvss2_score = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CVSS2_SCORE'), '')
+        if df_cvss2_score is not '':
+            report.update({ 'cvss2_score': df_cvss2_score })
+  
         df_cve_id = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CVE_ID'), '')
+        if df_cve_id is not '':
+            report.update({ 'cve':  df_cve_id.strip() })
+
         df_pkg_name = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'package_name'), '')
+        if df_pkg_name is not '':
+            report.update({ 'package_name': df_pkg_name.strip() })
         
-        # calculate the correct cvss2 string score (only if present)
         df_cvss2 = ''
         if df_cvss2_score is not '':
             try:
@@ -140,51 +200,110 @@ class scanWhispererAWSInspector(scanWhispererBase):
                     df_cvss2 = 'High'
                 elif (float(df_cvss2_score) == 10):
                     df_cvss2 = 'Critical'
+
+                report.update({ 'risk': df_cvss2 })
+                
             except ValueError:  
                 print ("Not a float")
 
-        return {    'CVSS3 Score': df_cvss3_score,
-                    'CVSS2 Score': df_cvss2_score,
-                    'CVSS2 Severity': self.cleanser(df_cvss2.strip().replace('\t', '')),
-                    'CVE': self.cleanser(df_cve_id.strip().replace('\t', '')),                   
-                    'Package Name': self.cleanser(df_pkg_name.strip().replace('\t', '')),
-                }
-
-
-    def create_report_cis(self, scan, finding):
+        # ---- CIS Part ----
         # extract CIS related fields (if present)
         df_cis_control = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'BENCHMARK_RULE_ID'), '')
+        if df_cis_control is not '':
+            report.update({ 'cis_control': df_cis_control.strip() })
+
         df_cis_benchmark = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'BENCHMARK_ID'), '')
+        if df_cis_benchmark is not '':
+            report.update({ 'cis_benchmark': df_cis_benchmark.strip() })
+
         df_cis_level = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CIS_BENCHMARK_PROFILE'), '')
+        if df_cis_level is not '':
+            report.update({ 'cis_level': df_cis_level.strip() })
         
         df_cis_severity = ''
         if df_cis_control is not '':
             df_cis_severity = finding.get('severity', '')
+            if df_cis_severity is not '':
+                report.update({ 'cis_severity': df_cis_severity.strip() })
 
-        return {    'CIS Control': self.cleanser(df_cis_control.replace('\t', '')),
-                    'CIS Benchmark': self.cleanser(df_cis_benchmark.replace('\t', '')),
-                    'CIS Level': self.cleanser(df_cis_level.replace('\t', '')),
-                    'CIS Severity': self.cleanser(df_cis_severity),
-                }     
+        # ---- SCAN TYPE DETECTION ----
+        # Detect scan type by existing fields
+        df_scan_type = ''
+        if report.get('cve'):
+            df_scan_type = 'cve'
+        elif report.get('cis_benchmark'):
+            df_scan_type = 'cis'
+        else:
+            df_scan_type = 'other'
         
-
-    # This function creates a single CSV output file row
-    def create_report(self, scan, finding):
-        # assemble report
-        report = {}
-
-        # Common part
-        report.update(self.create_report_common(scan, finding))
-
-        # Attributes part
-        report.update(self.create_report_cve(scan, finding))
-        report.update(self.create_report_cis(scan, finding))
+        report.update({ 'scan_type': df_scan_type })
 
         return report
 
+    
+    def push_report(self, scan, finding):
+
+        # Create report
+        report = self.create_report(scan, finding)
+
+        # Use scan_type field to generate id accordingly
+        document_id = ''
+        if report.get('scan_type') == 'cve':
+            document_id = hashlib.sha1(('{}{}'.format(report.get('asset'), report.get('cve'))).encode('utf-8')).hexdigest()
+        else:
+            document_id = hashlib.sha1(('{}{}'.format(report.get('asset'), report.get('title'))).encode('utf-8')).hexdigest()
+
+        # Create index on Elastic Search
+        try:
+            # create index if needed
+            mapping = {
+                "mappings": {
+                    "properties": {
+                        "cvss2_score": {
+                            "type": "float" 
+                        },
+                        "cvss3_score": {
+                            "type": "float" 
+                        }
+                    }
+                }
+            }
+            self.elastic_client.indices.create(index='scanwhisperer-{}-awsinspector'.format(report.get('scan_type')),body=mapping, ignore=400)
+
+        except Exception as e:
+            self.logger.error('Failed create index scanwhisperer-{}-awsinspector on Elastic Search: {}'.format(report.get('scan_type'), e)) 
+          
+        # Query Elastic Search to fetch a document with the same ID
+        # If found,overwrite new first_observed with older to avoid updating it
+        try:
+            # Fetch document
+            elk_response = self.elastic_client.search(index='scanwhisperer-{}-awsinspector'.format(report.get('scan_type')), body={
+                "query": {
+                    "match": {
+                        "_id": document_id
+                    }
+                }
+            })
+
+            # If document was found, apply older first observed
+            if elk_response.get('hits').get('total').get('value') == 1:
+                # Maintain old first observed
+                report['first_observed'] = elk_response.get('hits').get('hits')[0].get('_source').get('last_observed')
+
+        except Exception as e:
+            self.logger.error('Failed to get document from Elastic Search: {}'.format(e)) 
+
+        # Push report to Elastic
+        try:
+            # push report
+            self.elastic_client.update(index='scanwhisperer-{}-awsinspector'.format(report.get('scan_type')), id=document_id, body={'doc': report,'doc_as_upsert':True})
+        
+        except Exception as e:
+            self.logger.error('Failed push document to Elastic Search: {}'.format(e)) 
+
 
     def whisper_awsinspector(self):
-        if self.awsinspector_connect:
+        if self.awsinspector_connect and self.elk_connect:
             # get scan list from inspector, avoiding already fetched scans (if failed, throw an exception)
             try:
                 scans = self.get_scans_to_process(self.awsinspector.scans)
@@ -196,49 +315,47 @@ class scanWhispererAWSInspector(scanWhispererBase):
 
                 # cycle through every scan available
                 for scan in scans:
-                    findings = self.awsinspector.get_scan_findings(scan['arn'])
 
-                    # create the destination DataFrame
-                    output_csv = pd.DataFrame()
+                    # Try to request findings list
+                    try:
+                        findings = self.awsinspector.get_scan_findings(scan['arn'])
 
-                    # cycle through every finding
-                    for finding in findings:
-                        # parse the finding and add the row to output_csv
-                        try:
-                            output_csv = output_csv.append(self.create_report(scan, finding), ignore_index=True)
-                        except Exception as e:
-                            self.logger.warn('AWS Inspector finding fetch error: {}'.format(e))   
+                        # cycle through every finding
+                        whispered_count = 0
+                        for finding in findings:
+                            # parse the finding and add the row to output_csv
+                            try:
+                                self.push_report(scan, finding)
+                                whispered_count += 1
+                            except Exception as e:
+                                self.logger.error('AWS Inspector finding push error: {}'.format(e))   
 
-                    # save the output csv of the scan
-                    file_name = 'AWS_Inspector_%s.csv' % (time.time())
-                    repls = (('\\', '_'), ('/', '_'), (' ', '_'))
-                    file_name = reduce(lambda a, kv: a.replace(*kv), repls, file_name)
-                    relative_path_name = self.path_check(file_name)
-
-                    output_csv.to_csv(relative_path_name, index=False)
-
-                    # save the scan (assessmentRun) in the scanwhisperer db
-                    record_meta = (
-                                    scan['name'],
-                                    scan['arn'],
-                                    int(time.time()),
-                                    file_name,
-                                    int(time.time()),
-                                    output_csv.shape[0],
-                                    self.CONFIG_SECTION,
-                                    scan['arn'],
-                                    1,
-                                    0,
-                                )
-                    self.record_insert(record_meta)
-                    self.logger.info('{filename} records written to {path}'.format(filename=output_csv.shape[0], path=file_name))
+                        # save the scan (assessmentRun) in the scanwhisperer db
+                        record_meta = (
+                                        scan['name'],
+                                        scan['arn'],
+                                        int(time.time()),
+                                        'file_name',
+                                        int(time.time()),
+                                        whispered_count,
+                                        self.CONFIG_SECTION,
+                                        scan['arn'],
+                                        1,
+                                        0,
+                                    )
+                        self.record_insert(record_meta)
+                        self.logger.info('{} records whispered to Elastic Search'.format(whispered_count))
+                    
+                    except Exception as e:
+                        self.logger.error('Could not download {} scan {} findings: {}'.format(self.CONFIG_SECTION, scan['arn'], str(e)))
 
             except Exception as e:
-                self.logger.error('Could not download {} scan: {}'.format(self.CONFIG_SECTION, str(e)))
+                self.logger.error('Could not process new {} scans: {}'.format(self.CONFIG_SECTION, e))
 
-            self.logger.info('Scan aggregation complete!')
+            self.conn.close()
+            self.logger.info('Scan aggregation completed!')
         else:
-            self.logger.error('Failed to connect to AWS API')
+            self.logger.error('Failed to connect to {} API'.format(self.CONFIG_SECTION))
             self.exit_code += 1
         return self.exit_code
 
