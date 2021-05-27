@@ -41,8 +41,8 @@ class NiktoWrapperS3(object):
         return files
             
 
-    def download_file(self, remote_file_name, local_file_path):
-        self.s3.meta.client.download_file(self.bucket_name, remote_file_name, local_file_path)
+    def download_file(self, remote_file_name):
+        return self.s3.meta.client.get_object(Bucket=self.bucket_name, Key=remote_file_name)['Body'].read().decode('utf-8')
 
 
     def delete_file(self, remote_file_name):

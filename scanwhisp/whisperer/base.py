@@ -52,7 +52,6 @@ class scanWhispererBase(object):
             except:
                 self.enabled = False
 
-            self.write_path = self.config.get(self.CONFIG_SECTION, 'write_path')
             self.db_path = self.config.get(self.CONFIG_SECTION, 'db_path')
 
         if self.db_name is not None:
@@ -126,14 +125,6 @@ class scanWhispererBase(object):
     def cleanser(self, _data):
         repls = (('\n', r'\n'), ('\r', r'\r'))
         data = reduce(lambda a, kv: a.replace(*kv), repls, _data)
-        return data
-
-    def path_check(self, _data):
-        if self.write_path:
-            if '/' or '\\' in _data[-1]:
-                data = self.write_path + _data
-            else:
-                data = self.write_path + '/' + _data
         return data
 
     def record_insert(self, record):
