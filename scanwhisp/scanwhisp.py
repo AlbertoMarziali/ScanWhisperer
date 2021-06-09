@@ -10,6 +10,7 @@ from .base.config import swConfig
 from .whisperer.nessus import scanWhispererNessus
 from .whisperer.awsinspector import scanWhispererAWSInspector
 from .whisperer.niktowrapper import scanWhispererNiktoWrapper
+from .whisperer.bitsight import scanWhispererBitSight
 
 import pandas as pd
 from lxml import objectify
@@ -74,5 +75,11 @@ class scanWhisperer(object):
                                            verbose=self.verbose)
             if sw:
                 self.exit_code += sw.whisper_niktowrapper()
+
+        elif self.profile == 'bitsight':
+            sw = scanWhispererBitSight(config=self.config,
+                                        verbose=self.verbose)
+            if sw:
+                self.exit_code += sw.whisperer_bitsight()
 
         return self.exit_code
