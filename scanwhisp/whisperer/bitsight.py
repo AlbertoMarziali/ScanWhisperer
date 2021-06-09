@@ -110,7 +110,6 @@ class scanWhispererBitSight(scanWhispererBase):
     # This function creates a reports from a finding (one finding may contain multiple reports)
     def create_reports(self, company, finding):
         # assemble report: 
-        # hostname,ip,port,osvdb,httpmethod,uri,result,branch
         report = {}
 
         # Tool name
@@ -148,22 +147,22 @@ class scanWhispererBitSight(scanWhispererBase):
             report.update({ 'grade': df_grade })
 
         # Diligence annotation (extra data)
-        df_diligence_annotation= finding.get('details').get('diligence_annotation', '')
-        if df_diligence_annotation is not '':
-            report.update({ 'diligence_annotation': df_diligence_annotation })
+        df_diligence_annotations = finding.get('details').get('diligence_annotations', '')
+        if df_diligence_annotations is not '':
+            report.update({ 'diligence_annotations': df_diligence_annotations })
 
         # Observed IPS
-        df_observed_ips= finding.get('details').get('observed_ips', '')
+        df_observed_ips = finding.get('details').get('observed_ips', '')
         if df_observed_ips is not '':
             report.update({ 'observed_ips': df_observed_ips })
 
         # Rollup end date
-        df_rollup_end_date= finding.get('details').get('rollup_end_date', '')
+        df_rollup_end_date = finding.get('details').get('rollup_end_date', '')
         if df_rollup_end_date is not '':
             report.update({ 'rollup_end_date': df_rollup_end_date })
 
         # Rollup start date
-        df_rollup_start_date= finding.get('details').get('rollup_start_date', '')
+        df_rollup_start_date = finding.get('details').get('rollup_start_date', '')
         if df_rollup_start_date is not '':
             report.update({ 'rollup_start_date': df_rollup_start_date })
 
