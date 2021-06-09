@@ -273,7 +273,7 @@ class scanWhispererNessus(scanWhispererBase):
         # ---- SCAN TYPE SPECIFIC ACTIONS ----
         if report.get('scan_type') == 'cve':
             # add package_name field, for better integration with other tools
-            report.update({ 'plugin_name': finding.get('Name', '') })
+            report.update({ 'package_name': finding.get('Name', '') })
 
         return report
 
@@ -341,7 +341,7 @@ class scanWhispererNessus(scanWhispererBase):
             # If document was found, apply older first observed
             if elk_response.get('hits').get('total').get('value') == 1:
                 # Maintain old first observed
-                report['first_observed'] = elk_response.get('hits').get('hits')[0].get('_source').get('last_observed')
+                report['first_observed'] = elk_response.get('hits').get('hits')[0].get('_source').get('first_observed')
 
         except Exception as e:
             self.logger.error('Failed to get document from Elastic Search: {}'.format(e)) 

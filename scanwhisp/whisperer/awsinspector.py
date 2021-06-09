@@ -288,7 +288,7 @@ class scanWhispererAWSInspector(scanWhispererBase):
             # If document was found, apply older first observed
             if elk_response.get('hits').get('total').get('value') == 1:
                 # Maintain old first observed
-                report['first_observed'] = elk_response.get('hits').get('hits')[0].get('_source').get('last_observed')
+                report['first_observed'] = elk_response.get('hits').get('hits')[0].get('_source').get('first_observed')
 
         except Exception as e:
             self.logger.error('Failed to get document from Elastic Search: {}'.format(e)) 
