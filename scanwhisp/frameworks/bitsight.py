@@ -37,7 +37,7 @@ class BitSightAPI(object):
 
     def get_findings(self, company, callback):
         # url for first page
-        url = 'https://api.bitsighttech.com/ratings/v1/companies/{}/findings?expand=attributed_companies&grade=WARN%2CBAD&limit=100&offset=0'.format(company.get('guid'))
+        url = 'https://api.bitsighttech.com/ratings/v1/companies/{}/findings?expand=attributed_companies&grade=WARN%2CBAD&limit=200&offset=0'.format(company.get('guid'))
 
         # loop until url is None    
         while url:
