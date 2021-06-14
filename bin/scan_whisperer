@@ -9,6 +9,7 @@ import os
 import argparse
 import sys
 import logging
+from logging.handlers import RotatingFileHandler
 
 
 def isFileValid(parser, arg):
@@ -47,7 +48,7 @@ def main():
 
     if args.logfile:
         # we set up the logger to log as well to file
-        fh = logging.FileHandler(args.logfile)
+        fh = RotatingFileHandler(args.logfile, mode='a', maxBytes=1*1024*1024, backupCount=5, encoding=None, delay=0)
         fh.setLevel(logging.INFO)
         fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(funcName)s:%(message)s", "%Y-%m-%d %H:%M:%S"))
         logger.addHandler(fh)
