@@ -19,6 +19,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from datetime import datetime
 from geoip import geolite2
 import socket
+import json
+import re
 
 
 class scanWhispererBitSight(scanWhispererBase):
@@ -125,6 +127,16 @@ class scanWhispererBitSight(scanWhispererBase):
         if df_asset is not '':
             report.update({ 'asset': df_asset })
 
+        # Asset importance. Pick first
+        df_asset_importance = next((item.get('importance', '') for item in finding['assets']), '')
+        if df_asset_importance is not '':
+            report.update({ 'asset_importance': df_asset_importance })
+
+        # Asset category. Pick first
+        df_asset_category = next((item.get('category', '') for item in finding['assets']), '')
+        if df_asset_category is not '':
+            report.update({ 'asset_category': df_asset_category })
+
         # Attributed companies. Pick first not containing "Group", else pick absolute First.
         df_attributed_company = next((item.get('name', '') for item in finding['attributed_companies'] if item.get('name') and "Group" not in item.get('name', '')), '')
         if df_attributed_company is '':
@@ -149,7 +161,7 @@ class scanWhispererBitSight(scanWhispererBase):
         # Diligence annotation (extra data)
         df_diligence_annotations = finding.get('details').get('diligence_annotations', '')
         if df_diligence_annotations is not '':
-            report.update({ 'diligence_annotations': df_diligence_annotations })
+            report.update({ 'diligence_annotations': json.dumps(df_diligence_annotations, indent=4, sort_keys=True) })
 
         # Observed IPS
         df_observed_ips = finding.get('details').get('observed_ips', '')
@@ -171,11 +183,13 @@ class scanWhispererBitSight(scanWhispererBase):
         if df_evidence_key is not '':
             report.update({ 'evidence_key': df_evidence_key })
 
-        # Geoip coordinates (extract IP/hostname from Evidence Key)
-        if df_evidence_key is not '':
+        # Geoip coordinates (extract IP from Observed IPS)
+        if df_observed_ips is not '':
             try:
                 # IP Location lookup
-                df_geoip_location = geolite2.lookup(socket.gethostbyname(report['evidence_key'].split(":")[0]))
+                observed_ip = next((item for item in df_observed_ips), '')
+                extracted_ip = next((item for item in re.findall(r'(?:(?:1\d\d|2[0-5][0-5]|2[0-4]\d|0?[1-9]\d|0?0?\d)\.){3}(?:1\d\d|2[0-5][0-5]|2[0-4]\d|0?[1-9]\d|0?0?\d)', observed_ip)), '')
+                df_geoip_location = geolite2.lookup(extracted_ip)
                 if df_geoip_location:
                     report.update({ 'geoip_location': {
                                                 "lat": df_geoip_location.location[0],
