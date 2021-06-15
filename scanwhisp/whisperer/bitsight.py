@@ -21,6 +21,7 @@ from geoip import geolite2
 import socket
 import json
 import re
+import copy
 
 
 class scanWhispererBitSight(scanWhispererBase):
@@ -113,6 +114,7 @@ class scanWhispererBitSight(scanWhispererBase):
     def create_reports(self, company, finding):
         # assemble report: 
         report = {}
+        reports = []
 
         # Tool name
         report.update({ 'tags': self.CONFIG_SECTION })
@@ -121,21 +123,6 @@ class scanWhispererBitSight(scanWhispererBase):
         df_company = company.get('name', '')
         if df_company is not '':
             report.update({ 'company': df_company })
-
-        # Asset. Pick first
-        df_asset = next((item.get('asset', '') for item in finding['assets']), '')
-        if df_asset is not '':
-            report.update({ 'asset': df_asset })
-
-        # Asset importance. Pick first
-        df_asset_importance = next((item.get('importance', '') for item in finding['assets']), '')
-        if df_asset_importance is not '':
-            report.update({ 'asset_importance': df_asset_importance })
-
-        # Asset category. Pick first
-        df_asset_category = next((item.get('category', '') for item in finding['assets']), '')
-        if df_asset_category is not '':
-            report.update({ 'asset_category': df_asset_category })
 
         # Attributed companies. Pick first not containing "Group", else pick absolute First.
         df_attributed_company = next((item.get('name', '') for item in finding['attributed_companies'] if item.get('name') and "Group" not in item.get('name', '')), '')
@@ -253,28 +240,75 @@ class scanWhispererBitSight(scanWhispererBase):
         if df_temporary_id is not '':
             report.update({ 'temporary_id': df_temporary_id })
 
-        # Multiple remediations generate multiple reports.
+        # Report is almost ready
+        reports.append(report)
+
+        # REPORT DUPLICATION
+        # Multiple assets and remediation leads to multiple reports
+
+        # ASSET: Multiple assets generate multiple reports
+        # Tecnique: copy the report list and duplicate each field in a new one
+        df_assets = finding.get('assets', [])
+        if df_assets:
+            new_reports = []
+
+            # copy each report from reports and multiply it
+            for single_report in reports:
+
+                # create a new report for each asset
+                for asset in df_assets:
+                    new_report = copy.deepcopy(single_report) # copy the report
+
+                    # Asset name
+                    df_asset = asset.get('asset', '') 
+                    if df_asset is not '':
+                        new_report.update({ 'asset': df_asset })
+
+                    # Asset importance
+                    df_asset_importance = asset.get('importance', '')
+                    if df_asset_importance is not '':
+                        new_report.update({ 'asset_importance': df_asset_importance })
+
+                    # Asset category
+                    df_asset_category = asset.get('category', '')
+                    if df_asset_category is not '':
+                        new_report.update({ 'asset_category': df_asset_category })
+
+                    # Add report to new reports
+                    new_reports.append(new_report)
+
+            # Replace report list
+            reports = copy.deepcopy(new_reports)
+
+        # REMEDIATIONS: Multiple remediations generate multiple reports.
         # Loop over remediations and create a new report for each one
-        reports = []
-
-        df_remediations = finding.get('details').get('remediations')
+        # Tecnique: copy the report list and duplicate each field in a new one
+        df_remediations = finding.get('details').get('remediations', [])
         if df_remediations:
-            for remediation in df_remediations:
-                # Add Message Field
-                df_message = remediation.get('message', '')
-                if df_message is not '':
-                    report.update({ 'message': df_message })
+            new_reports = []
 
-                # Add Remediation Field
-                df_remediation_tip = remediation.get('remediation_tip', '')
-                if df_remediation_tip is not '':
-                    report.update({ 'remediation': df_remediation_tip })
+            # copy each report from reports and multiply it
+            for single_report in reports:
 
-                # Append to list
-                reports.append(report)
-        else:
-            # Just append current report
-            reports.append(report)
+                # create a new report for each remediation
+                for remediation in df_remediations:
+                    new_report = copy.deepcopy(single_report) # copy the report
+
+                    # Add Message Field
+                    df_message = remediation.get('message', '')
+                    if df_message is not '':
+                        new_report.update({ 'message': df_message })
+
+                    # Add Remediation Field
+                    df_remediation_tip = remediation.get('remediation_tip', '')
+                    if df_remediation_tip is not '':
+                        new_report.update({ 'remediation': df_remediation_tip })
+
+                    # Add report to new reports
+                    new_reports.append(new_report)
+
+            # Replace report list
+            reports = copy.deepcopy(new_reports)
 
         # Return the generated reports
         return reports
