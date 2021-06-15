@@ -9,6 +9,7 @@ The main differences between the original version and this version are:
 - Works with Python3
 - Supports AWS Inspector API
 - Supports NiktoWrapper (S3)
+- Supports BitSight API
 - Has been stripped down (OpenVAS, Qualys, Jira and MockAPI removed)
 - Sends reports to Elastic Search via API, completely bypassing Logstash
 
@@ -21,6 +22,7 @@ Currently Supports
 - [X] [Tenable.io](https://www.tenable.com/products/tenable-io)
 - [X] [AWS Inspector](https://aws.amazon.com/it/inspector/)
 - [X] [NiktoWrapper (S3)](https://github.com/AlbertoMarziali/NiktoWrapper)
+- [X] [BitSight](https://www.bitsight.com)
 
 ### Reporting Frameworks
 
@@ -39,7 +41,7 @@ Requirements
 -------------
 ####
 *   Python 3+
-*   Vulnerability Scanner (AWS Inspector, Nessus, Tenable.io)
+*   Vulnerability Scanner (AWS Inspector, Nessus, Tenable.io, NiktoWrapper, BitSight)
 *   Reporting System: ElasticStack 6+
 
 <a id="installreq">Installation</a>
