@@ -146,6 +146,12 @@ class scanWhispererAWSInspector(scanWhispererBase):
         report.update({ 'last_observed': df_last_observed  })
 
         # ---- Finding Common part ----
+        df_finding_arn = finding['arn']
+        report.update({'finding_arn': df_finding_arn})
+
+        df_aws_account_id = next((item for item in re.findall(r'^arn:aws:inspector:.*:([0-9]*):.*$', finding['arn'])), '')
+        report.update({'aws_account_id': df_aws_account_id})
+
         df_agentId = finding['assetAttributes']['agentId']
         report.update({ 'asset': df_agentId.strip() })
 
