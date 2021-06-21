@@ -117,133 +117,84 @@ class scanWhispererAWSInspector(scanWhispererBase):
 
         return scans_to_process
 
+    # This function adds field to report
+    def add_to_report(self, report, field, content):
+        if content:
+            if isinstance(content, str):
+                content = content.strip()
+
+            report.update({ field : content.strip() })
+
 
     # This function creates a single report
     def create_report(self, scan, finding):
         # assemble report
         report = {}
 
-        # ---- Scan data part ----
-        report.update({ 'tags': 'awsinspector' })
+        # ---- AWS Inspector specific part ----
+        # This fields are exclusive to AWS Inspector
+        self.add_to_report(report, 'awsinspector.scan.arn', scan['arn'])
+        self.add_to_report(report, 'awsinspector.scan.name', scan.get('name')) 
+        self.add_to_report(report, 'awsinspector.rules_package.arn', finding.get('serviceAttributes', {}).get('rulesPackageArn'))
+        self.add_to_report(report, 'awsinspector.rules_package.name', self.awsinspector.get_rule_name(finding.get('serviceAttributes').get('rulesPackageArn')))
+        self.add_to_report(report, 'awsinspector.finding.arn', finding['arn'])
+        self.add_to_report(report, 'awsinspector.aws_account_id', next((item for item in re.findall(r'^arn:aws:inspector:.*:([0-9]*):.*$', finding['arn'])), None))
+        self.add_to_report(report, 'awsinspector.tag', next((item.get('value') for item in finding['assetAttributes']['tags'] if item.get('key') == 'Name'), ''))
 
-        df_scanArn = scan['arn']
-        report.update({ 'scan_arn' : df_scanArn.strip() })
-
-        df_scanName = scan.get('name', '')
-        report.update({ 'scan_name' : df_scanName.strip() })
-
-        df_ruleArn = finding.get('serviceAttributes').get('rulesPackageArn')
-        report.update({ 'rules_package_arn' : df_ruleArn.strip() })
-
-        df_ruleName = self.awsinspector.get_rule_name(finding.get('serviceAttributes').get('rulesPackageArn'))
-        report.update({ 'rules_package_name': df_ruleName.strip() })
-
-        # ---- Time part ----
-        df_first_observed = finding.get('updatedAt', datetime.now()).isoformat()
-        report.update({ 'first_observed': df_first_observed })
-
-        df_last_observed = finding.get('updatedAt', datetime.now()).isoformat()
-        report.update({ 'last_observed': df_last_observed  })
-
-        # ---- Finding Common part ----
-        df_finding_arn = finding['arn']
-        report.update({'finding_arn': df_finding_arn})
-
-        df_aws_account_id = next((item for item in re.findall(r'^arn:aws:inspector:.*:([0-9]*):.*$', finding['arn'])), '')
-        report.update({'aws_account_id': df_aws_account_id})
-
-        df_agentId = finding['assetAttributes']['agentId']
-        report.update({ 'asset': df_agentId.strip() })
-
-        df_publicIp = next((item.get('publicIp', '') for item in finding['assetAttributes']['networkInterfaces'] if item.get('publicIp') != ''), '')
-        if df_publicIp is not '':
-            report.update({ 'ip': df_publicIp.strip() })
-
-        df_tagName = next((item.get('value', '') for item in finding['assetAttributes']['tags'] if item.get('key') == 'Name'), '')
-        if df_tagName is not '':
-            report.update({ 'tag': df_tagName.strip() })
-
-        df_title = finding.get('title', '')
-        if df_title is not '':
-            report.update({ 'title': df_title.strip() })
-
-        df_description = finding.get('description', '')
-        if df_description is not '':
-            report.update({ 'description': df_description.strip() })
-
-        df_recommendation = finding.get('recommendation', '')
-        if df_recommendation is not '':
-            report.update({ 'solution' : df_recommendation.strip() })
+        # ---- Asset part ----
+        # Scan target (asset) properties
+        self.add_to_report(report, 'asset.host', finding['assetAttributes']['agentId'])
+        self.add_to_report(report, 'asset.ip', next((item.get('publicIp') for item in finding['assetAttributes']['networkInterfaces'] if item.get('publicIp') != ''), None))
 
         # ---- CVE part ----
         # extract CVE related fields (if present)
-        df_cvss3_score = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CVSS3_SCORE'), '')
-        if df_cvss3_score is not '':
-             report.update({ 'cvss3_score': df_cvss3_score })
-
-        df_cvss2_score = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CVSS2_SCORE'), '')
-        if df_cvss2_score is not '':
-            report.update({ 'cvss2_score': df_cvss2_score })
-  
-        df_cve_id = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CVE_ID'), '')
-        if df_cve_id is not '':
-            report.update({ 'cve':  df_cve_id.strip() })
-
-        df_pkg_name = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'package_name'), '')
-        if df_pkg_name is not '':
-            report.update({ 'package_name': df_pkg_name.strip() })
-        
-        df_cvss2 = ''
-        if df_cvss2_score is not '':
-            try:
-                if(float(df_cvss2_score) == 0):
-                    df_cvss2 = 'Info'
-                elif (float(df_cvss2_score) <= 3.9):
-                    df_cvss2 = 'Low'
-                elif (float(df_cvss2_score) <= 6.9):
-                    df_cvss2 = 'Medium'
-                elif (float(df_cvss2_score) <= 9.9):
-                    df_cvss2 = 'High'
-                elif (float(df_cvss2_score) == 10):
-                    df_cvss2 = 'Critical'
-
-                report.update({ 'risk': df_cvss2 })
-                
-            except ValueError:  
-                print ("Not a float")
+        self.add_to_report(report, 'cve.id', next((item.get('value') for item in finding['attributes'] if item.get('key') == 'CVE_ID'), None))
+        self.add_to_report(report, 'cve.cvss3.score', next((item.get('value') for item in finding['attributes'] if item.get('key') == 'CVSS3_SCORE'), None))
+        self.add_to_report(report, 'cve.cvss2.score', next((item.get('value') for item in finding['attributes'] if item.get('key') == 'CVSS2_SCORE'), None))
+        self.add_to_report(report, 'cve.package_name', next((item.get('value') for item in finding['attributes'] if item.get('key') == 'package_name'), None))
 
         # ---- CIS Part ----
         # extract CIS related fields (if present)
-        df_cis_control = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'BENCHMARK_RULE_ID'), '')
-        if df_cis_control is not '':
-            report.update({ 'cis_control': df_cis_control.strip() })
-
-        df_cis_benchmark = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'BENCHMARK_ID'), '')
-        if df_cis_benchmark is not '':
-            report.update({ 'cis_benchmark': df_cis_benchmark.strip() })
-
-        df_cis_level = next((item.get('value', '') for item in finding['attributes'] if item.get('key') == 'CIS_BENCHMARK_PROFILE'), '')
-        if df_cis_level is not '':
-            report.update({ 'cis_level': df_cis_level.strip() })
+        self.add_to_report(report, 'cis.control', next((item.get('value') for item in finding['attributes'] if item.get('key') == 'BENCHMARK_RULE_ID'), None))
+        self.add_to_report(report, 'cis.benchmark', next((item.get('value') for item in finding['attributes'] if item.get('key') == 'BENCHMARK_ID'), None))
+        self.add_to_report(report, 'cis.level', next((item.get('value') for item in finding['attributes'] if item.get('key') == 'CIS_BENCHMARK_PROFILE'), None))
         
-        df_cis_severity = ''
-        if df_cis_control is not '':
-            df_cis_severity = finding.get('severity', '')
-            if df_cis_severity is not '':
-                report.update({ 'cis_severity': df_cis_severity.strip() })
-
-        # ---- SCAN TYPE DETECTION ----
-        # Detect scan type by existing fields
-        df_scan_type = ''
-        if report.get('cve'):
-            df_scan_type = 'cve'
-        elif report.get('cis_benchmark'):
-            df_scan_type = 'cis'
+        # ---- Finding metadata part ----
+        # extract Finding metadata 
+        self.add_to_report(report, 'finding.title', finding.get('title'))
+        self.add_to_report(report, 'finding.description', finding.get('description'))
+        self.add_to_report(report, 'finding.solution', finding.get('recommendation'))
+        self.add_to_report(report, 'finding.source', 'awsinspector')
+        self.add_to_report(report, 'finding.first_observed', finding.get('updatedAt', datetime.now()).isoformat())
+        self.add_to_report(report, 'finding.last_observed', finding.get('updatedAt', datetime.now()).isoformat())
+        # guess finding type by existing fields
+        if report.get('cve.id'):
+            self.add_to_report(report, 'finding.type', 'cve')
+        elif report.get('cis.benchmark'):
+            self.add_to_report(report, 'finding.type', 'cis')
         else:
-            df_scan_type = 'other'
-        
-        report.update({ 'scan_type': df_scan_type })
+            self.add_to_report(report, 'finding.type', 'other')
+        # calculate finding risk
+        if report.get('cve.cvss2.score'):
+            # Calculate risk based off cvss2 score
+            try:
+                if(float(report.get('cve.cvss2.score')) == 0):
+                    self.add_to_report(report, 'finding.risk', 'Info')
+                elif (float(report.get('cve.cvss2.score')) <= 3.9):
+                    self.add_to_report(report, 'finding.risk', 'Low')
+                elif (float(report.get('cve.cvss2.score')) <= 6.9):
+                    self.add_to_report(report, 'finding.risk', 'Medium')
+                elif (float(report.get('cve.cvss2.score')) <= 9.9):
+                    self.add_to_report(report, 'finding.risk', 'High')
+                elif (float(report.get('cve.cvss2.score')) == 10):
+                    self.add_to_report(report, 'finding.risk', 'Critical')        
+            except ValueError:  
+                print ("Not a float")
+        else:
+            # Use AWS Inspector severity as Risk
+            self.add_to_report(report, 'finding.risk', finding.get('severity'))
 
+        
         return report
 
     
@@ -254,10 +205,10 @@ class scanWhispererAWSInspector(scanWhispererBase):
 
         # Use scan_type field to generate id accordingly
         document_id = ''
-        if report.get('scan_type') == 'cve':
-            document_id = hashlib.sha1(('{}{}'.format(report.get('asset'), report.get('cve'))).encode('utf-8')).hexdigest()
+        if report.get('finding.type') == 'cve':
+            document_id = hashlib.sha1(('{}{}'.format(report.get('asset.host'), report.get('cve.id'))).encode('utf-8')).hexdigest()
         else:
-            document_id = hashlib.sha1(('{}{}'.format(report.get('asset'), report.get('title'))).encode('utf-8')).hexdigest()
+            document_id = hashlib.sha1(('{}{}'.format(report.get('asset.host'), report.get('finding.title'))).encode('utf-8')).hexdigest()
 
         # Create index on Elastic Search
         try:
@@ -265,25 +216,25 @@ class scanWhispererAWSInspector(scanWhispererBase):
             mapping = {
                 "mappings": {
                     "properties": {
-                        "cvss2_score": {
+                        "cve.cvss2.score": {
                             "type": "float" 
                         },
-                        "cvss3_score": {
+                        "cve.cvss3.score": {
                             "type": "float" 
                         }
                     }
                 }
             }
-            self.elastic_client.indices.create(index='scanwhisperer-{}-awsinspector'.format(report.get('scan_type')),body=mapping, ignore=400)
+            self.elastic_client.indices.create(index='scanwhisperer-{}-awsinspector'.format(report.get('finding.type')),body=mapping, ignore=400)
 
         except Exception as e:
-            self.logger.error('Failed create index scanwhisperer-{}-awsinspector on Elastic Search: {}'.format(report.get('scan_type'), e)) 
+            self.logger.error('Failed create index scanwhisperer-{}-awsinspector on Elastic Search: {}'.format(report.get('finding.type'), e)) 
           
         # Query Elastic Search to fetch a document with the same ID
         # If found,overwrite new first_observed with older to avoid updating it
         try:
             # Fetch document
-            elk_response = self.elastic_client.search(index='scanwhisperer-{}-awsinspector'.format(report.get('scan_type')), body={
+            elk_response = self.elastic_client.search(index='scanwhisperer-{}-awsinspector'.format(report.get('finding.type')), body={
                 "query": {
                     "match": {
                         "_id": document_id
@@ -294,7 +245,7 @@ class scanWhispererAWSInspector(scanWhispererBase):
             # If document was found, apply older first observed
             if elk_response.get('hits').get('total').get('value') == 1:
                 # Maintain old first observed
-                report['first_observed'] = elk_response.get('hits').get('hits')[0].get('_source').get('first_observed')
+                report['finding.first_observed'] = elk_response.get('hits').get('hits')[0].get('_source').get('finding.first_observed')
 
         except Exception as e:
             self.logger.error('Failed to get document from Elastic Search: {}'.format(e)) 
@@ -302,7 +253,7 @@ class scanWhispererAWSInspector(scanWhispererBase):
         # Push report to Elastic
         try:
             # push report
-            self.elastic_client.update(index='scanwhisperer-{}-awsinspector'.format(report.get('scan_type')), id=document_id, body={'doc': report,'doc_as_upsert':True})
+            self.elastic_client.update(index='scanwhisperer-{}-awsinspector'.format(report.get('finding.type')), id=document_id, body={'doc': report,'doc_as_upsert':True})
         
         except Exception as e:
             self.logger.error('Failed push document to Elastic Search: {}'.format(e)) 
