@@ -104,6 +104,13 @@ class scanWhispererNessus(scanWhispererBase):
             except Exception as e:
                 self.logger.error('Could not properly load your config: {}'.format(e))
 
+    # This function adds field to report
+    def add_to_report(self, report, field, content):
+        if content:
+            if isinstance(content, str):
+                content = content.strip()
+
+            report.update({ field : content })
 
     # This function creates a single report
     def create_report(self, scan, finding):
@@ -112,168 +119,58 @@ class scanWhispererNessus(scanWhispererBase):
         # TENABLEIO: Plugin ID,CVE,CVSS,Risk,Host,Protocol,Port,Name,Synopsis,Description,Solution,See Also,Plugin Output,Asset UUID,Vulnerability State,IP Address,FQDN,NetBios,OS,MAC Address,Plugin Family,CVSS Base Score,CVSS Temporal Score,CVSS Temporal Vector,CVSS Vector,CVSS3 Base Score,CVSS3 Temporal Score,CVSS3 Temporal Vector,CVSS3 Vector,System Type,Host Start,Host End
         report = {}
 
-        # ---- Scan data part ----
-        report.update({ 'tags': self.CONFIG_SECTION })
+        # ---- Nessus/Tenable.io only part
+        self.add_to_report(report, '{}.scan.name'.format(self.CONFIG_SECTION), scan.get('scan_name'))
+        self.add_to_report(report, '{}.scan.id'.format(self.CONFIG_SECTION), scan.get('scan_id'))
+        self.add_to_report(report, '{}.history.id'.format(self.CONFIG_SECTION), scan.get('history_id'))
+        self.add_to_report(report, '{}.plugin.id'.format(self.CONFIG_SECTION), finding.get('Plugin ID'))
+        self.add_to_report(report, '{}.plugin.name'.format(self.CONFIG_SECTION), finding.get('Name'))
+        self.add_to_report(report, 'tenableio.plugin.family', finding.get('Plugin Family')) # Tenable.io only
 
-        df_scan_name = scan.get('scan_name', '')
-        report.update({ 'scan_name': df_scan_name })
+        # ---- Asset part ----
+        self.add_to_report(report, 'asset.host', finding.get('Host'))
+        self.add_to_report(report, 'asset.ip', finding.get('IP Address', finding.get('Host', ''))) # Tenable.io only, fix for Nessus
+        self.add_to_report(report, 'asset.port', finding.get('Port'))   
+        self.add_to_report(report, 'asset.protocol', finding.get('Protocol'))
+        self.add_to_report(report, 'asset.uuid', finding.get('Asset UUID')) # Tenable.io only
+        self.add_to_report(report, 'asset.fqdn', finding.get('FQDN')) # Tenable.io only
+        self.add_to_report(report, 'asset.netbios', finding.get('NetBios')) # Tenable.io only
+        self.add_to_report(report, 'asset.os', finding.get('OS')) # Tenable.io only
+        self.add_to_report(report, 'asset.mac_address', finding.get('Mac Address')) # Tenable.io only
+        self.add_to_report(report, 'asset.system_type', finding.get('System Type')) # Tenable.io only
 
-        df_scan_id = scan.get('scan_id', '')
-        report.update({ 'scan_id': str(df_scan_id) })
+        # ---- CVE Part ----
+        self.add_to_report(report, 'cve.id', finding.get('CVE')) 
+        self.add_to_report(report, 'cve.cvss.score', finding.get('CVSS')) 
+        self.add_to_report(report, 'cve.cvss.vector', finding.get('CVSS Vector'))  # Tenable.io only
+        self.add_to_report(report, 'cve.cvss2.score', finding.get('CVSS')) 
+        self.add_to_report(report, 'cve.cvss.base.score', finding.get('CVSS Base Score'))  # Tenable.io only
+        self.add_to_report(report, 'cve.cvss.temporal.score', finding.get('CVSS Temporal Score'))  # Tenable.io only
+        self.add_to_report(report, 'cve.cvss.temporal.vector', finding.get('CVSS Temporal Vector'))  # Tenable.io only
+        self.add_to_report(report, 'cve.cvss3.score', finding.get('CVSS3 Base Score'))  # Tenable.io only
+        self.add_to_report(report, 'cve.cvss3.vector', finding.get('CVSS3 Vector'))  # Tenable.io only
+        self.add_to_report(report, 'cve.cvss3.base.score', finding.get('CVSS3 Base Score'))  # Tenable.io only
+        self.add_to_report(report, 'cve.cvss3.temporal.score', finding.get('CVSS3 Temporal Score'))  # Tenable.io only
+        self.add_to_report(report, 'cve.cvss3.temporal.vector', finding.get('CVSS3 Temporal Vector'))  # Tenable.io only
+        if report.get('cve.id'):
+            self.add_to_report(report, 'cve.package_name', finding.get('Name'))  
 
-        df_history_id = scan.get('history_id', '')
-        report.update({ 'history_id': str(df_history_id) })
-
-        df_plugin_id = finding.get('Plugin ID', '')
-        report.update({ 'plugin_id': str(df_plugin_id) })
-
-        df_plugin_name = finding.get('Name', '')
-        report.update({ 'plugin_name': df_plugin_name })
-
-        # ---- Time part ----
-        df_first_observed = datetime.fromtimestamp(scan.get('norm_time', datetime.now().timestamp())).isoformat()
-        report.update({ 'first_observed': df_first_observed })
-
-        df_last_observed =  datetime.fromtimestamp(scan.get('norm_time', datetime.now().timestamp())).isoformat()
-        report.update({ 'last_observed': df_last_observed  })
-
-        # ---- Common finding part ----
-        df_risk = finding.get('Risk', '')
-        if df_risk is not '':
-            report.update({ 'risk': df_risk })
-
-        df_asset = finding.get('Host', '')
-        report.update({ 'asset': df_asset })
-
-        df_protocol = finding.get('Protocol', '')
-        if df_protocol is not '':
-            report.update({ 'protocol': df_protocol })
-
-        df_port = finding.get('Port', '')
-        report.update({ 'port': df_port })
-
-        df_title = finding.get('Synopsis', '')
-        if df_title is not '':
-            report.update({ 'title': df_title.strip() })
-
-        df_description = finding.get('Description', '')
-        if df_description is not '':
-            report.update({ 'description': df_description.strip() })
-
-        df_solution = finding.get('Solution', '')
-        if df_solution is not '':
-            report.update({ 'solution' : df_solution.strip() })
-
-        df_see_also = finding.get('See Also', '')
-        if df_see_also is not '':
-            report.update({ 'see_also' : df_see_also.strip() })
-
-        df_plugin_output = finding.get('Plugin Output', '')
-        if df_plugin_output is not '':
-            report.update({ 'plugin_output' : df_plugin_output.strip() })
-
-        df_asset_uuid = finding.get('Asset UUID', '')  # Tenable.io only
-        if df_asset_uuid is not '':
-            report.update({ 'asset_uuid' : df_asset_uuid })
-
-        df_vuln_state = finding.get('Vulnerability State', '') # Tenable.io only
-        if df_vuln_state is not '':
-            report.update({ 'vulnerability_state' : df_vuln_state })
-
-        df_ip = finding.get('IP Address', finding.get('Host', '')) # Tenable.io only, fix for Nessus
-        report.update({ 'ip' : df_ip })
-
-        df_fqdn = finding.get('FQDN', '') # Tenable.io only
-        if df_fqdn is not '':
-            report.update({ 'fqdn' : df_fqdn })
-
-        df_netbios = finding.get('NetBios', '') # Tenable.io only
-        if df_netbios is not '':
-            report.update({ 'netbios' : df_netbios })
-            
-        df_os = finding.get('OS', '') # Tenable.io only
-        if df_os is not '':
-            report.update({ 'os' : df_os })
-
-        df_mac_address = finding.get('Mac Address', '') # Tenable.io only
-        if df_mac_address is not '':
-            report.update({ 'mac_address' : df_mac_address })
-
-        df_plugin_family = finding.get('Plugin Family', '') # Tenable.io only
-        if df_plugin_family is not '':
-            report.update({ 'plugin_family' : df_plugin_family })
-
-        df_system_type = finding.get('System Type', '') # Tenable.io only
-        if df_system_type is not '':
-            report.update({ 'system_type' : df_system_type })
-
-        df_host_start = finding.get('Host Start', '') # Tenable.io only
-        if df_host_start is not '':
-            report.update({ 'host_start' : df_host_start })
-
-        df_host_end = finding.get('Host End', '') # Tenable.io only
-        if df_host_end is not '':
-            report.update({ 'host_end' : df_host_end })
-
-        # ---- CVE part ----
-        # extract CVE related fields (if present)
-        # CVE,CVSS,CVSS Base Score,CVSS Temporal Score,CVSS Temporal Vector,|CVSS Vector,CVSS3 Base Score,CVSS3 Temporal Score,CVSS3 Temporal Vector,CVSS3 Vector,
-        df_cve = finding.get('CVE', '') 
-        if df_cve is not '':
-            report.update({ 'cve' : df_cve })
-
-        df_cvss = finding.get('CVSS', '') 
-        if df_cvss is not '':
-            report.update({ 'cvss' : df_cvss })
-            report.update({ 'cvss2_score' : df_cvss })
-
-        df_cvss_base_score = finding.get('CVSS Base Score', '') # Tenable.io only
-        if df_cvss_base_score is not '':
-            report.update({ 'cvss_base_score' : df_cvss_base_score })
-
-        df_cvss_temporal_score = finding.get('CVSS Temporal Score', '') # Tenable.io only
-        if df_cvss_temporal_score is not '':
-            report.update({ 'cvss_temporal_score' : df_cvss_temporal_score })
-
-        df_cvss_temporal_vector = finding.get('CVSS Temporal Vector', '') # Tenable.io only
-        if df_cvss_temporal_vector is not '':
-            report.update({ 'cvss_temporal_vector' : df_cvss_temporal_vector })
-
-        df_cvss_vector = finding.get('CVSS Vector', '') # Tenable.io only
-        if df_cvss_vector is not '':
-            report.update({ 'cvss_vector' : df_cvss_vector })
-
-        df_cvss3_base_score = finding.get('CVSS3 Base Score', '') # Tenable.io only
-        if df_cvss3_base_score is not '':
-            report.update({ 'cvss3_base_score' : df_cvss3_base_score })
-            report.update({ 'cvss3_score' : df_cvss3_base_score })
-
-        df_cvss3_temporal_score = finding.get('CVSS3 Temporal Score', '') # Tenable.io only
-        if df_cvss3_temporal_score is not '':
-            report.update({ 'cvss3_temporal_score' : df_cvss3_temporal_score })
-
-        df_cvss3_temporal_vector = finding.get('CVSS3 Temporal Vector', '') # Tenable.io only
-        if df_cvss3_temporal_vector is not '':
-            report.update({ 'cvss3_temporal_vector' : df_cvss3_temporal_vector })
-
-        df_cvss3_vector = finding.get('CVSS3 Vector', '') # Tenable.io only
-        if df_cvss3_vector is not '':
-            report.update({ 'cvss3_vector' : df_cvss3_vector })
-        
-        # ---- SCAN TYPE DETECTION ----
-        # Detect scan type by existing fields
-        df_scan_type = ''
-        if report.get('cve'):
-            df_scan_type = 'cve'
+        # ---- Finding metadata part ----
+        self.add_to_report(report, 'finding.first_observed', datetime.fromtimestamp(scan.get('norm_time', datetime.now().timestamp())).isoformat())
+        self.add_to_report(report, 'finding.last_observed', datetime.fromtimestamp(scan.get('norm_time', datetime.now().timestamp())).isoformat())
+        self.add_to_report(report, 'finding.risk', finding.get('Risk'))
+        self.add_to_report(report, 'finding.title', finding.get('Synopsis'))
+        self.add_to_report(report, 'finding.description', finding.get('Description'))
+        self.add_to_report(report, 'finding.solution', finding.get('Solution'))
+        self.add_to_report(report, 'finding.source', self.CONFIG_SECTION)
+        self.add_to_report(report, 'finding.plugin_output', finding.get('Plugin Output'))
+        self.add_to_report(report, 'finding.see_also', finding.get('See Also'))
+        self.add_to_report(report, 'finding.state', finding.get('Vulnerability State')) # Tenable.io only
+        # Guess finding type by existing fields
+        if report.get('cve.id'):
+            self.add_to_report(report, 'finding.type', 'cve')
         else:
-            df_scan_type = 'other'
-        
-        report.update({ 'scan_type': df_scan_type })
-
-        # ---- SCAN TYPE SPECIFIC ACTIONS ----
-        if report.get('scan_type') == 'cve':
-            # add package_name field, for better integration with other tools
-            report.update({ 'package_name': finding.get('Name', '') })
+            self.add_to_report(report, 'finding.type', 'other')
 
         return report
 
@@ -285,10 +182,10 @@ class scanWhispererNessus(scanWhispererBase):
 
         # Use scan_type field to generate id accordingly
         document_id = ''
-        if report.get('scan_type') == 'cve':
-            document_id = hashlib.sha1(('{}{}{}'.format(report.get('ip'), report.get('port'), report.get('cve'))).encode('utf-8')).hexdigest()
+        if report.get('finding.type') == 'cve':
+            document_id = hashlib.sha1(('{}{}{}'.format(report.get('asset.ip'), report.get('asset.port'), report.get('finding.cve'))).encode('utf-8')).hexdigest()
         else:
-            document_id = hashlib.sha1(('{}{}{}'.format(report.get('ip'), report.get('port'), report.get('title'))).encode('utf-8')).hexdigest()
+            document_id = hashlib.sha1(('{}{}{}'.format(report.get('asset.ip'), report.get('asset.port'), report.get('finding.title'))).encode('utf-8')).hexdigest()
 
         # Create index on Elastic Search
         try:
@@ -296,41 +193,41 @@ class scanWhispererNessus(scanWhispererBase):
             mapping = {
                 "mappings": {
                     "properties": {
-                        "cvss": {
+                        "cve.cvss.score": {
                             "type": "float" 
                         },
-                        "cvss2_score": {
+                        "cve.cvss2.score": {
                             "type": "float" 
                         },
-                        "cvss_base_score": {
+                        "cve.cvss.base.score": {
                             "type": "float" 
                         },
-                        "cvss_temporal_score": {
+                        "cve.cvss.temporal.score": {
                             "type": "float" 
                         },
-                        "cvss3_score": {
+                        "cve.cvss3.score": {
                             "type": "float" 
                         },
-                        "cvss3_base_score": {
+                        "cve.cvss3.base.score": {
                             "type": "float" 
                         },
-                        "cvss3_temporal_score": {
+                        "cve.cvss3.temporal.score": {
                             "type": "float" 
                         },
 
                     }
                 }
             }
-            self.elastic_client.indices.create(index='scanwhisperer-{}-{}'.format(report.get('scan_type'), self.CONFIG_SECTION),body=mapping, ignore=400)
+            self.elastic_client.indices.create(index='scanwhisperer-{}-{}'.format(report.get('finding.type'), self.CONFIG_SECTION),body=mapping, ignore=400)
 
         except Exception as e:
-            self.logger.error('Failed create index scanwhisperer-{}-{} on Elastic Search: {}'.format(report.get('scan_type'), self.CONFIG_SECTION, e)) 
+            self.logger.error('Failed create index scanwhisperer-{}-{} on Elastic Search: {}'.format(report.get('finding.type'), self.CONFIG_SECTION, e)) 
           
         # Query Elastic Search to fetch a document with the same ID
         # If found,overwrite new first_observed with older to avoid updating it
         try:
             # Fetch document
-            elk_response = self.elastic_client.search(index='scanwhisperer-{}-{}'.format(report.get('scan_type'), self.CONFIG_SECTION), body={
+            elk_response = self.elastic_client.search(index='scanwhisperer-{}-{}'.format(report.get('finding.type'), self.CONFIG_SECTION), body={
                 "query": {
                     "match": {
                         "_id": document_id
@@ -341,7 +238,7 @@ class scanWhispererNessus(scanWhispererBase):
             # If document was found, apply older first observed
             if elk_response.get('hits').get('total').get('value') == 1:
                 # Maintain old first observed
-                report['first_observed'] = elk_response.get('hits').get('hits')[0].get('_source').get('first_observed')
+                report['finding.first_observed'] = elk_response.get('hits').get('hits')[0].get('_source').get('finding.first_observed')
 
         except Exception as e:
             self.logger.error('Failed to get document from Elastic Search: {}'.format(e)) 
@@ -349,7 +246,7 @@ class scanWhispererNessus(scanWhispererBase):
         # Push report to Elastic
         try:
             # push report
-            self.elastic_client.update(index='scanwhisperer-{}-{}'.format(report.get('scan_type'), self.CONFIG_SECTION), id=document_id, body={'doc': report,'doc_as_upsert':True})
+            self.elastic_client.update(index='scanwhisperer-{}-{}'.format(report.get('finding.type'), self.CONFIG_SECTION), id=document_id, body={'doc': report,'doc_as_upsert':True})
         
         except Exception as e:
             self.logger.error('Failed push document to Elastic Search: {}'.format(e)) 

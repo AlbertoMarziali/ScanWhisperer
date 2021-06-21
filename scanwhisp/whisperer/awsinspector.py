@@ -123,7 +123,7 @@ class scanWhispererAWSInspector(scanWhispererBase):
             if isinstance(content, str):
                 content = content.strip()
 
-            report.update({ field : content.strip() })
+            report.update({ field : content })
 
 
     # This function creates a single report
