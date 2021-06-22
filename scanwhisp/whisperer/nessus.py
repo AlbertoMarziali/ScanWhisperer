@@ -183,7 +183,7 @@ class scanWhispererNessus(scanWhispererBase):
         # Use scan_type field to generate id accordingly
         document_id = ''
         if report.get('finding.type') == 'cve':
-            document_id = hashlib.sha1(('{}{}{}'.format(report.get('asset.ip'), report.get('asset.port'), report.get('finding.cve'))).encode('utf-8')).hexdigest()
+            document_id = hashlib.sha1(('{}{}{}'.format(report.get('asset.ip'), report.get('asset.port'), report.get('cve.id'))).encode('utf-8')).hexdigest()
         else:
             document_id = hashlib.sha1(('{}{}{}'.format(report.get('asset.ip'), report.get('asset.port'), report.get('finding.title'))).encode('utf-8')).hexdigest()
 
