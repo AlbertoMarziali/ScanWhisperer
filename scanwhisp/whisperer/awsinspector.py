@@ -117,7 +117,8 @@ class scanWhispererAWSInspector(scanWhispererBase):
 
         return scans_to_process
 
-    # This function adds field to report
+
+    # This function adds a field to report
     def add_to_report(self, report, field, content):
         if content:
             if isinstance(content, str):
