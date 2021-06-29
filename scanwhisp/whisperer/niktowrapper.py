@@ -87,7 +87,15 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
             except Exception as e:
                 self.logger.error('Could not properly load your config!\nReason: {e}'.format(e=e))
                 
-    
+
+    # This function adds a field to report
+    def add_to_report(self, report, field, content):
+        if content:
+            if isinstance(content, str):
+                content = content.strip()
+
+            report.update({ field : content })
+
 
     # This function creates a single report
     def create_report(self, finding):
@@ -95,52 +103,27 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
         # hostname,ip,port,osvdb,httpmethod,uri,result,branch
         report = {}
 
-        # ---- Scan data part ----
-        report.update({ 'tags': self.CONFIG_SECTION })
-
-        df_hostname = finding.get('hostname', '')
-        if df_hostname is not '':
-            report.update({ 'hostname': df_hostname })
-
-        df_ip = finding.get('ip', '')
-        report.update({ 'ip': df_ip })
-
-        df_port = finding.get('port', '')
-        report.update({ 'port': df_port })
-
-        df_osvdb = finding.get('osvdb', '')
-        if df_osvdb is not '':
-            report.update({ 'osvdb': df_osvdb })
-
-        df_httpmethod = finding.get('httpmethod', '')
-        if df_httpmethod is not '':
-            report.update({ 'httpmethod': df_httpmethod })
-
-        df_uri = finding.get('uri', '')
-        if df_uri is not '':
-            report.update({ 'uri': df_uri })
-
-        df_result = finding.get('result', '')
-        report.update({ 'result': df_result })
-
-        df_branch = finding.get('branch', '')
-        if df_branch is not '':
-            report.update({ 'branch': df_branch })
-
-        # ---- Time part ----
-        df_first_observed = datetime.now().isoformat()
-        report.update({ 'first_observed': df_first_observed })
-
-        df_last_observed =  datetime.now().isoformat()
-        report.update({ 'last_observed': df_last_observed })
-
-        # ---- GEOIP part ----
-        df_geoip = geolite2.lookup(report['ip'])
+        # ---- Asset part ----
+        self.add_to_report(report, 'asset.name', finding.get('hostname'))
+        self.add_to_report(report, 'asset.ip', finding.get('ip'))
+        self.add_to_report(report, 'asset.port', finding.get('port'))  
+        self.add_to_report(report, 'asset.branch', finding.get('branch')) 
+        # geoip
+        df_geoip = geolite2.lookup(report.get('asset.ip'))
         if df_geoip:
-            report.update({ 'location': {
-                                            "lat": df_geoip.location[0],
-                                            "lon": df_geoip.location[1]
-                                        } })
+            self.add_to_report(report, 'asset.geo.location', {
+                                                "lat": df_geoip.location[0],
+                                                "lon": df_geoip.location[1]
+                                            })
+
+        # ---- Finding part ----
+        self.add_to_report(report, 'finding.source', self.CONFIG_SECTION)
+        self.add_to_report(report, 'finding.osvdb', finding.get('osvdb'))
+        self.add_to_report(report, 'finding.httpmethod', finding.get('httpmethod'))
+        self.add_to_report(report, 'finding.uri', finding.get('uri'))
+        self.add_to_report(report, 'finding.title', finding.get('result'))
+        self.add_to_report(report, 'finding.first_observed', datetime.now().isoformat())
+        self.add_to_report(report, 'finding.last_observed', datetime.now().isoformat())
 
         return report
 
@@ -151,7 +134,7 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
         report = self.create_report(finding)
 
         # Generate id 
-        document_id = hashlib.sha1(('{}{}{}'.format(report.get('ip'), report.get('port'), report.get('result'))).encode('utf-8')).hexdigest()
+        document_id = hashlib.sha1(('{}{}{}{}'.format(report.get('asset.name'), report.get('asset.ip'), report.get('asset.port'), report.get('finding.title'))).encode('utf-8')).hexdigest()
         
         # Create index on Elastic Search
         try:
@@ -159,10 +142,10 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
             mapping = {
                 "mappings": {
                     "properties": {
-                        "port": {
+                        "asset.port": {
                             "type": "integer" 
                         },
-                        "location": {
+                        "asset.geo.location": {
                             "type": "geo_point" 
                         }
                     }
@@ -188,7 +171,7 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
             # If document was found, apply older first observed
             if elk_response.get('hits').get('total').get('value') == 1:
                 # Maintain old first observed
-                report['first_observed'] = elk_response.get('hits').get('hits')[0].get('_source').get('first_observed')
+                report['finding.first_observed'] = elk_response.get('hits').get('hits')[0].get('_source').get('finding.first_observed')
 
         except Exception as e:
             self.logger.error('Failed to get document from Elastic Search: {}'.format(e)) 
