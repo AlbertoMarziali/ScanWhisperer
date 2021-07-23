@@ -167,7 +167,7 @@ class scanWhispererNessus(scanWhispererBase):
         self.add_to_report(report, 'finding.see_also', finding.get('See Also'))
         self.add_to_report(report, 'finding.state', finding.get('Vulnerability State')) # Tenable.io only
         # Guess finding type by existing fields
-        if report.get('cve.id'):
+        if report.get('cve.cvss.score'):
             self.add_to_report(report, 'finding.type', 'cve')
         else:
             self.add_to_report(report, 'finding.type', 'other')
@@ -181,11 +181,7 @@ class scanWhispererNessus(scanWhispererBase):
         report = self.create_report(scan, finding)
 
         # Use scan_type field to generate id accordingly
-        document_id = ''
-        if report.get('finding.type') == 'cve':
-            document_id = hashlib.sha1(('{}{}{}'.format(report.get('asset.ip'), report.get('asset.port'), report.get('cve.id'))).encode('utf-8')).hexdigest()
-        else:
-            document_id = hashlib.sha1(('{}{}{}'.format(report.get('asset.ip'), report.get('asset.port'), report.get('finding.title'))).encode('utf-8')).hexdigest()
+        document_id = hashlib.sha1(('{}{}{}{}'.format(report.get('asset.ip'), report.get('asset.port'), report.get('cve.id', ''), report.get('finding.title'))).encode('utf-8')).hexdigest()
 
         # Create index on Elastic Search
         try:
