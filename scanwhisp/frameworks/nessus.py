@@ -177,9 +177,3 @@ class NessusAPI(object):
         self.logger.debug('Converted timestamp {} in datetime {}'.format(date_time, local_time))
         return local_time
 
-    def tz_conv(self, tz):
-        time_map = {'Eastern Standard Time': 'US/Eastern',
-                    'Central Standard Time': 'US/Central',
-                    'Pacific Standard Time': 'US/Pacific',
-                    'None': 'US/Central'}
-        return time_map.get(tz, None)

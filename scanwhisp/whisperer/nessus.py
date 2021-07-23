@@ -273,7 +273,7 @@ class scanWhispererNessus(scanWhispererBase):
                         record['status'] = h.get('status', '')
                         record['history_id'] = h.get('history_id', '')
                         record['last_modification_date'] = h.get('last_modification_date', '')
-                        record['norm_time'] = self.nessus.get_utc_from_local(int(record['last_modification_date']), local_tz=self.nessus.tz_conv(record['timezone']))
+                        record['norm_time'] = self.nessus.get_utc_from_local(int(record['last_modification_date']), local_tz=record['timezone'])
                     
                         scans_to_process.append(record.copy())
                 except:
