@@ -129,14 +129,14 @@ class scanWhispererNessus(scanWhispererBase):
 
         # ---- Asset part ----
         self.add_to_report(report, 'asset.host', finding.get('Host'))
-        self.add_to_report(report, 'asset.ip', finding.get('IP Address', finding.get('Host', ''))) # Tenable.io only, fix for Nessus
+        self.add_to_report(report, 'asset.ip', finding.get('IP Address')) 
         self.add_to_report(report, 'asset.port', finding.get('Port'))   
         self.add_to_report(report, 'asset.protocol', finding.get('Protocol'))
         self.add_to_report(report, 'asset.uuid', finding.get('Asset UUID')) # Tenable.io only
-        self.add_to_report(report, 'asset.fqdn', finding.get('FQDN')) # Tenable.io only
-        self.add_to_report(report, 'asset.netbios', finding.get('NetBios')) # Tenable.io only
-        self.add_to_report(report, 'asset.os', finding.get('OS')) # Tenable.io only
-        self.add_to_report(report, 'asset.mac_address', finding.get('Mac Address')) # Tenable.io only
+        self.add_to_report(report, 'asset.fqdn', finding.get('FQDN')) 
+        self.add_to_report(report, 'asset.netbios', finding.get('NetBios')) 
+        self.add_to_report(report, 'asset.os', finding.get('OS')) 
+        self.add_to_report(report, 'asset.mac_address', finding.get('Mac Address')) 
         self.add_to_report(report, 'asset.system_type', finding.get('System Type')) # Tenable.io only
 
         # ---- CVE Part ----
@@ -308,6 +308,22 @@ class scanWhispererNessus(scanWhispererBase):
                         # Import requested scan report inside a DataFrame
                         report_csv = pd.read_csv(io.StringIO(report_req), na_filter=False)
 
+                        # ONLY FOR NESSUS: Add Host info
+                        if len(report_csv) > 0 and self.CONFIG_SECTION == 'nessus':
+                            self.logger.info('Fetching host info')
+                            host_list = self.nessus.get_scan_hosts(scan_id=scan['scan_id'], history_id=scan['history_id'])
+
+                            # Edit the dataframe to add host info
+                            report_csv['IP Address'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('host-ip', ''), axis=1) 
+                            report_csv['FQDN'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('host-fqdn', ''), axis=1) 
+                            report_csv['NetBios'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('netbios-name', ''), axis=1) 
+                            report_csv['OS'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('operating-system', ''), axis=1) 
+                            report_csv['Mac Address'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('mac-address', ''), axis=1) 
+
+                            self.logger.info('Added host info for {} hosts'.format(len(host_list)))
+
+                        self.logger.info('Pushing {} {} reports to Elastic Search'.format(report_csv.shape[0], self.CONFIG_SECTION))
+
                         # Iterate over report lines and push it to Elastic Search
                         try:
                             for index, finding in report_csv.iterrows():
@@ -330,7 +346,7 @@ class scanWhispererNessus(scanWhispererBase):
                             )
                         self.record_insert(record_meta)
 
-                        self.logger.info('{} {} records whispered to Elastic Search'.format(report_csv.shape[0], self.CONFIG_SECTION))
+                        self.logger.info('{} {} reports pushed to Elastic Search'.format(report_csv.shape[0], self.CONFIG_SECTION))
 
                     except Exception as e:
                         self.logger.error('Could not download {} scan {}: {}'.format(self.CONFIG_SECTION, scan['scan_id'], e))

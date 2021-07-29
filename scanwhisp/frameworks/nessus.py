@@ -13,17 +13,6 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class NessusAPI(object):
-    SESSION = '/session'
-    FOLDERS = '/folders'
-    SCANS = '/scans'
-    SCAN_ID = SCANS + '/{scan_id}'
-    HOST_VULN = SCAN_ID + '/hosts/{host_id}'
-    PLUGINS = HOST_VULN + '/plugins/{plugin_id}'
-    EXPORT = SCAN_ID + '/export'
-    EXPORT_TOKEN_DOWNLOAD = '/scans/exports/{token_id}/download'
-    EXPORT_FILE_DOWNLOAD = EXPORT + '/{file_id}/download'
-    EXPORT_STATUS = EXPORT + '/{file_id}/status'
-    EXPORT_HISTORY = EXPORT + '?history_id={history_id}'
 
     def __init__(self, hostname=None, port=None, username=None, password=None, verbose=False, profile=None, access_key=None, secret_key=None):
         self.logger = logging.getLogger('NessusAPI')
@@ -69,7 +58,7 @@ class NessusAPI(object):
 
     def login(self):
         auth = '{"username":"%s", "password":"%s"}' % (self.user, self.password)
-        resp = self.request(self.SESSION, data=auth, json_output=False)
+        resp = self.request('/session', data=auth, json_output=False)
         if resp.status_code == 200:
             self.session.headers['X-Cookie'] = 'token={token}'.format(token=resp.json()['token'])
         else:
@@ -86,7 +75,7 @@ class NessusAPI(object):
         while (timeout <= 10) and (not success):
             response = getattr(self.session, method)(url, data=data)
             if response.status_code == 401:
-                if url == self.base + self.SESSION:
+                if url == self.base + '/session':
                     break
                 try:
                     timeout += 1
@@ -114,7 +103,7 @@ class NessusAPI(object):
         return response
 
     def get_scans(self):
-        scans = self.request(self.SCANS, method='GET', json_output=True)
+        scans = self.request('/scans', method='GET', json_output=True)
         return scans
 
     def get_scan_ids(self):
@@ -124,8 +113,29 @@ class NessusAPI(object):
         return scan_ids
 
     def get_scan_history(self, scan_id):
-        data = self.request(self.SCAN_ID.format(scan_id=scan_id), method='GET', json_output=True)
+        data = self.request('/scans/{scan_id}'.format(scan_id=scan_id), method='GET', json_output=True)
         return data['history']
+
+    def get_scan_hosts(self, scan_id, history_id=None):
+        host_list = {}
+
+        if not history_id:
+            query = '/scans/{scan_id}'.format(scan_id=scan_id)
+        else:
+            query = '/scans/{scan_id}?history_id={history_id}'.format(scan_id=scan_id, history_id=history_id)
+        data = self.request(query, method='GET', json_output=True)
+
+        for host in data['hosts']:
+            if host['hostname'] not in host_list:
+                if not history_id:
+                    query = '/scans/{scan_id}/hosts/{host_id}'.format(scan_id=scan_id, host_id=host['host_id'])
+                else:
+                    query = '/scans/{scan_id}/hosts/{host_id}?history_id={history_id}'.format(scan_id=scan_id, host_id=host['host_id'], history_id=history_id)
+                
+                host_list[host['hostname']] = self.request(query, method='GET', json_output=True)['info']
+
+        return host_list
+
 
     def download_scan(self, scan_id=None, history=None, export_format=""):
         running = True
@@ -133,9 +143,9 @@ class NessusAPI(object):
 
         data = {'format': export_format}
         if not history:
-            query = self.EXPORT.format(scan_id=scan_id)
+            query = '/scans/{scan_id}/export'.format(scan_id=scan_id)
         else:
-            query = self.EXPORT_HISTORY.format(scan_id=scan_id, history_id=history)
+            query = '/scans/{scan_id}/export?history_id={history_id}'.format(scan_id=scan_id, history_id=history)
             scan_id = str(scan_id)
         req = self.request(query, data=json.dumps(data), method='POST', json_output=True)
         try:
@@ -148,7 +158,7 @@ class NessusAPI(object):
         while running:
             time.sleep(2)
             counter += 2
-            report_status = self.request(self.EXPORT_STATUS.format(scan_id=scan_id, file_id=file_id), method='GET',
+            report_status = self.request('/scans/{scan_id}/export/{file_id}/status'.format(scan_id=scan_id, file_id=file_id), method='GET',
                                          json_output=True)
             running = report_status['status'] != 'ready'
             sys.stdout.write(".")
@@ -158,9 +168,9 @@ class NessusAPI(object):
                 self.logger.info("Completed: {}".format(counter))
         self.logger.info("Done: {}".format(counter))
         if self.profile == 'tenableio' or self.api_keys:
-            content = self.request(self.EXPORT_FILE_DOWNLOAD.format(scan_id=scan_id, file_id=file_id), method='GET', download=True)
+            content = self.request('/scans/{scan_id}/export/{file_id}/download'.format(scan_id=scan_id, file_id=file_id), method='GET', download=True)
         else:
-            content = self.request(self.EXPORT_TOKEN_DOWNLOAD.format(token_id=token_id), method='GET', download=True)
+            content = self.request('/scans/exports/{token_id}/download'.format(token_id=token_id), method='GET', download=True)
         return content
 
     def get_utc_from_local(self, date_time, local_tz=None, epoch=True):
