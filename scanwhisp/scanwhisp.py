@@ -7,7 +7,7 @@ from functools import reduce
 __author__ = 'Austin Taylor'
 
 from .base.config import swConfig
-from .whisperer.nessus import scanWhispererNessus
+from .modules.nessus.nessus import scanWhispererNessus
 from .whisperer.awsinspector import scanWhispererAWSInspector
 from .whisperer.niktowrapper import scanWhispererNiktoWrapper
 from .whisperer.bitsight import scanWhispererBitSight
