@@ -21,8 +21,8 @@ class NessusELK(object):
         logging.getLogger('elasticsearch').setLevel(logging.CRITICAL)
         self.elastic_client = Elasticsearch('https://{}:{}@{}'.format(self.username, self.password, self.host), ca_certs=False, verify_certs=False)
         
-        # Document batch
-        self.document_batch = {}
+        # Document queue
+        self.document_queue = {}
 
 
     # This function adds field to document
@@ -74,7 +74,7 @@ class NessusELK(object):
         self.add_field_to_document(document, 'cve.cvss3.base.score', finding.get('CVSS3 Base Score'))  # Tenable.io only
         self.add_field_to_document(document, 'cve.cvss3.temporal.score', finding.get('CVSS3 Temporal Score'))  # Tenable.io only
         self.add_field_to_document(document, 'cve.cvss3.temporal.vector', finding.get('CVSS3 Temporal Vector'))  # Tenable.io only
-        if document.get('cve.id'):
+        if document.get('cve.cvss.score'):
             self.add_field_to_document(document, 'cve.package_name', finding.get('Name'))  
 
         # ---- Finding metadata part ----
@@ -97,8 +97,8 @@ class NessusELK(object):
         return document
 
 
-    # This function adds the document to the batch. If already there, it applies some changes to CVE field
-    def add_document(self, scan, finding):
+    # This function adds the document to the queue. If already there, it applies some changes to CVE field
+    def add_to_queue(self, scan, finding):
 
         # Create Document
         document = self.create_document(scan, finding)
@@ -106,30 +106,30 @@ class NessusELK(object):
         # Create Document ID
         document_id = hashlib.sha1(('{}{}{}'.format(document.get('asset.ip'), document.get('asset.port'), document.get('{}.plugin.id'.format(self.profile)))).encode('utf-8')).hexdigest()
 
-        # Check if the document is already in the batch
-        if self.document_batch.get(document_id):
+        # Check if the document is already in the queue
+        if self.document_queue.get(document_id):
             # If cve.id in old document, copy over to new document
-            if self.document_batch.get(document_id).get('cve.id'):
+            if self.document_queue.get(document_id).get('cve.id'):
                                             
                 # If cve.id in new document and not in older document, add older cve.id to new cve.id, else just copy over
-                if document.get('cve.id') and document.get('cve.id') not in self.document_batch.get(document_id).get('cve.id'):
+                if document.get('cve.id') and document.get('cve.id') not in self.document_queue.get(document_id).get('cve.id'):
                     # Add older cve.id to new cve.id
-                    document['cve.id'] = '{},{}'.format(self.document_batch.get(document_id).get('cve.id'), document.get('cve.id'))
+                    document['cve.id'] = '{},{}'.format(self.document_queue.get(document_id).get('cve.id'), document.get('cve.id'))
                 else:
                     # Copy older cve.id in new document
-                    document['cve.id'] = self.document_batch.get(document_id).get('cve.id')
+                    document['cve.id'] = self.document_queue.get(document_id).get('cve.id')
 
-        # Add (or replace) document to the batch
-        self.document_batch.update({ document_id : document })
+        # Add (or replace) document to the queue
+        self.document_queue.update({ document_id : document })
 
 
     # Push documents to Elastic Search
-    def push_documents(self):
+    def push_queue(self):
 
-        self.logger.info('Pushing {} {} documents.'.format(len(self.document_batch, self.profile)))
+        self.logger.info('Pushing {} {} documents.'.format(len(self.document_queue), self.profile))
 
-        # Iterate over document batch
-        for document_id, document in self.document_batch.items():
+        # Iterate over document queue
+        for document_id, document in self.document_queue.items():
             
             # Create index on Elastic Search
             try:
@@ -195,7 +195,7 @@ class NessusELK(object):
             except Exception as e:
                 self.logger.error('Failed push document to Elastic Search: {}'.format(e)) 
 
-        self.logger.info('Pushed {} {} documents to Elastic Search'.format(len(self.document_batch), self.profile))
+        self.logger.info('Pushed {} {} documents to Elastic Search'.format(len(self.document_queue), self.profile))
 
         # Clear queue after push
-        self.document_batch = {}
+        self.document_queue = {}

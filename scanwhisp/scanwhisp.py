@@ -10,7 +10,7 @@ from .base.config import swConfig
 from .modules.nessus.nessus import scanWhispererNessus
 from .whisperer.awsinspector import scanWhispererAWSInspector
 from .whisperer.niktowrapper import scanWhispererNiktoWrapper
-from .whisperer.bitsight import scanWhispererBitSight
+from .modules.bitsight.bitsight import scanWhispererBitSight
 
 import pandas as pd
 from lxml import objectify

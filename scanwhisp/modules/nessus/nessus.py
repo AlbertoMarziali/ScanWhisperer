@@ -4,7 +4,7 @@ from __future__ import absolute_import
 from six.moves import range
 from functools import reduce
 
-__author__ = 'Austin Taylor'
+__author__ = 'Alberto Marziali'
 
 from ...base.config import swConfig
 from ...whisperer.base import scanWhispererBase
@@ -79,7 +79,7 @@ class scanWhispererNessus(scanWhispererBase):
                                    access_key=self.access_key,
                                    secret_key=self.secret_key
                                   )
-                    self.nessus_connect = True
+                    self.nessusapi_connect = True
                     self.logger.info('Connected to {} on {host}:{port}'.format(self.CONFIG_SECTION, host=self.nessus_hostname,port=str(self.nessus_port)))
 
                     try:
@@ -91,7 +91,7 @@ class scanWhispererNessus(scanWhispererBase):
                                     username=self.elk_username,
                                     password=self.elk_password,
                                     )
-                        self.elk_connect = True
+                        self.nessuselk_connect = True
                         self.logger.info('Connected to Elastic Search ({})'.format(self.elk_host))
 
                     except Exception as e:
@@ -144,7 +144,7 @@ class scanWhispererNessus(scanWhispererBase):
 
 
     def whisper_nessus(self):
-        if self.nessus_connect and self.elk_connect:
+        if self.nessusapi_connect and self.nessuselk_connect:
             # get scan list from nessus/tenableio, avoiding already fetched scans (if failed, throw an exception)
             try:
                 scan_list = self.get_scans_to_process(self.nessusapi.scans['scans'])
@@ -183,10 +183,10 @@ class scanWhispererNessus(scanWhispererBase):
                             # Iterate over report rows
                             for index, finding in report_csv.iterrows():
                                 # Add document from finding
-                                self.nessuselk.add_document(scan, finding)
+                                self.nessuselk.add_to_queue(scan, finding)
 
                              # When document batch is ready, push it
-                            self.nessuselk.push_documents()
+                            self.nessuselk.push_queue()
 
                         except Exception as e:
                             self.logger.error('{} finding push error: {}'.format(self.CONFIG_SECTION, e))   
