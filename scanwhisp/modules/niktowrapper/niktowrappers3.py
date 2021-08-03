@@ -1,9 +1,5 @@
 from __future__ import absolute_import
-import json
 import logging
-import sys
-import time
-from datetime import datetime
 
 import boto3 #AWS Python SDK
 

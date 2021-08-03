@@ -13,16 +13,9 @@ from ...modules.nessus.nessuselk import NessusELK
 
 import pandas as pd
 from lxml import objectify
-import sys
-import os
 import io
 import time
-import sqlite3
-import json
 import logging
-import socket
-from datetime import datetime
-
 
 
 class scanWhispererNessus(scanWhispererBase):

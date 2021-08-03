@@ -78,8 +78,8 @@ class NessusELK(object):
             self.add_field_to_document(document, 'cve.package_name', finding.get('Name'))  
 
         # ---- Finding metadata part ----
-        self.add_field_to_document(document, 'finding.first_observed', datetime.fromtimestamp(scan.get('norm_time', datetime.now().timestamp())).isoformat())
-        self.add_field_to_document(document, 'finding.last_observed', datetime.fromtimestamp(scan.get('norm_time', datetime.now().timestamp())).isoformat())
+        self.add_field_to_document(document, 'finding.first_observed', datetime.fromtimestamp(scan.get('norm_time', datetime.utcnow().timestamp())).isoformat())
+        self.add_field_to_document(document, 'finding.last_observed', datetime.fromtimestamp(scan.get('norm_time', datetime.utcnow().timestamp())).isoformat())
         self.add_field_to_document(document, 'finding.risk', finding.get('Risk'))
         self.add_field_to_document(document, 'finding.title', finding.get('Synopsis'))
         self.add_field_to_document(document, 'finding.description', finding.get('Description'))
