@@ -13,8 +13,10 @@ warnings.filterwarnings("ignore")
 
 class BitSightELK(object):
 
-    def __init__(self, username, password, host):
-        self.logger = logging.getLogger('BitSightELK')
+    def __init__(self, verbose = False, username = None, password = None, host = None):
+        self.logger = logging.getLogger('BitSightELK')        
+        if verbose:
+            self.logger.setLevel(logging.DEBUG)
 
         self.username = username
         self.password = password
@@ -185,7 +187,7 @@ class BitSightELK(object):
     # Push documents to Elastic Search
     def push_queue(self):
 
-        self.logger.info('Pushing {} bitsight documents.'.format(len(self.document_queue)))
+        self.logger.debug('Pushing {} bitsight documents.'.format(len(self.document_queue)))
 
         # Iterate over document queue
         for document in self.document_queue:
@@ -196,7 +198,7 @@ class BitSightELK(object):
             except Exception as e:
                 self.logger.error('Failed push document to Elastic Search: {}'.format(e)) 
 
-        self.logger.info('Pushed {} bitsight documents to Elastic Search'.format(len(self.document_queue)))
+        self.logger.debug('Pushed {} bitsight documents to Elastic Search'.format(len(self.document_queue)))
 
         # Clear queue after push
         self.document_queue = {}

@@ -10,8 +10,10 @@ warnings.filterwarnings("ignore")
 
 class NessusELK(object):
 
-    def __init__(self, profile, username, password, host):
+    def __init__(self, verbose = False, profile=None, username=None, password=None, host=None):
         self.logger = logging.getLogger('NessusELK')
+        if verbose:
+            self.logger.setLevel(logging.DEBUG)
 
         self.profile = profile      
         self.username = username
@@ -127,7 +129,7 @@ class NessusELK(object):
     # Push documents to Elastic Search
     def push_queue(self):
 
-        self.logger.info('Pushing {} {} documents.'.format(len(self.document_queue), self.profile))
+        self.logger.debug('Pushing {} {} documents.'.format(len(self.document_queue), self.profile))
 
         # Iterate over document queue
         for document_id, document in self.document_queue.items():
@@ -196,7 +198,7 @@ class NessusELK(object):
             except Exception as e:
                 self.logger.error('Failed push document to Elastic Search: {}'.format(e)) 
 
-        self.logger.info('Pushed {} {} documents to Elastic Search'.format(len(self.document_queue), self.profile))
+        self.logger.debug('Pushed {} {} documents to Elastic Search'.format(len(self.document_queue), self.profile))
 
         # Clear queue after push
         self.document_queue = {}

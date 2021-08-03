@@ -12,8 +12,10 @@ warnings.filterwarnings("ignore")
 
 class NiktoWrapperELK(object):
 
-    def __init__(self, username, password, host):
+    def __init__(self, verbose = False, username = None, password = None, host = None):
         self.logger = logging.getLogger('NiktoWrapperELK')
+        if verbose:
+            self.logger.setLevel(logging.DEBUG)
 
         self.username = username
         self.password = password
@@ -83,7 +85,7 @@ class NiktoWrapperELK(object):
     # Push documents to Elastic Search
     def push_queue(self):
 
-        self.logger.info('Pushing {} niktowrapper documents'.format(len(self.document_queue)))
+        self.logger.debug('Pushing {} niktowrapper documents'.format(len(self.document_queue)))
 
         # Iterate over document queue
         for document_id, document in self.document_queue.items():
@@ -136,7 +138,7 @@ class NiktoWrapperELK(object):
             except Exception as e:
                 self.logger.error('Failed push document to Elastic Search: {}'.format(e)) 
 
-        self.logger.info('Pushed {} niktowrapper documents to Elastic Search'.format(len(self.document_queue)))
+        self.logger.debug('Pushed {} niktowrapper documents to Elastic Search'.format(len(self.document_queue)))
 
         # Clear queue after push
         self.document_queue = {}

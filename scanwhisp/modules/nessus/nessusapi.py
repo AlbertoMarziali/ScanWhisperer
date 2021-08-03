@@ -79,7 +79,7 @@ class NessusAPI(object):
                     if self.api_keys:
                         continue
                     self.login()
-                    self.logger.info('Token refreshed')
+                    self.logger.debug('Token refreshed')
                 except Exception as e:
                     self.logger.error('Could not refresh token\nReason: {}'.format(str(e)))
             else:
@@ -151,7 +151,7 @@ class NessusAPI(object):
                 token_id = req['token'] if 'token' in req else req['temp_token']
         except Exception as e:
             self.logger.error('{}'.format(str(e)))
-        self.logger.info('Download for file id {}'.format(str(file_id)))
+        self.logger.debug('Download for file id {}'.format(str(file_id)))
         while running:
             time.sleep(2)
             counter += 2
@@ -162,8 +162,8 @@ class NessusAPI(object):
             sys.stdout.flush()
             # FIXME: why? can this be removed in favour of a counter?
             if counter % 60 == 0:
-                self.logger.info("Completed: {}".format(counter))
-        self.logger.info("Done: {}".format(counter))
+                self.logger.debug("Completed: {}".format(counter))
+        self.logger.debug("Done: {}".format(counter))
         if self.profile == 'tenableio' or self.api_keys:
             content = self.request('/scans/{scan_id}/export/{file_id}/download'.format(scan_id=scan_id, file_id=file_id), method='GET', download=True)
         else:

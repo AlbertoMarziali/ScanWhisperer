@@ -17,6 +17,8 @@ import io
 import time
 import logging
 
+from yaspin import yaspin
+
 
 class scanWhispererNessus(scanWhispererBase):
     CONFIG_SECTION = None
@@ -83,6 +85,7 @@ class scanWhispererNessus(scanWhispererBase):
                                     host=self.elk_host,
                                     username=self.elk_username,
                                     password=self.elk_password,
+                                    verbose=verbose
                                     )
                         self.nessuselk_connect = True
                         self.logger.info('Connected to Elastic Search ({})'.format(self.elk_host))
@@ -100,7 +103,6 @@ class scanWhispererNessus(scanWhispererBase):
     # This function returns a list of scans to process (each scan is combined with history)
     def get_scans_to_process(self, scans):
 
-        self.logger.info('Gathering all scan data... this may take a while...')
         scans_to_process = []
         for s in scans:
             if s:
@@ -152,37 +154,53 @@ class scanWhispererNessus(scanWhispererBase):
                     
                     # Try to request scan report
                     try:
+                        # Start
+                        self.logger.info('Processing {} scan {}, (history {})'.format(self.CONFIG_SECTION, scan['scan_id'], scan['history_id']))
+
                         # Download the scan report and import inside a DataFrame
-                        report_req = self.nessusapi.download_scan(scan_id=scan['scan_id'], history=scan['history_id'], export_format='csv')
-                        report_csv = pd.read_csv(io.StringIO(report_req), na_filter=False)
+                        with yaspin(text="Downloading findings", color="cyan") as spinner:
+                            report_req = self.nessusapi.download_scan(scan_id=scan['scan_id'], history=scan['history_id'], export_format='csv')
+                            report_csv = pd.read_csv(io.StringIO(report_req), na_filter=False)
+                            spinner.ok("✅")
 
                         # ONLY FOR NESSUS: Add Host info
                         if len(report_csv) > 0 and self.CONFIG_SECTION == 'nessus':
-                            self.logger.info('Fetching host info')
-                            host_list = self.nessusapi.get_scan_hosts(scan_id=scan['scan_id'], history_id=scan['history_id'])
+                            
+                            with yaspin(text="Fetching host info", color="cyan") as spinner:
+                                host_list = self.nessusapi.get_scan_hosts(scan_id=scan['scan_id'], history_id=scan['history_id'])
 
-                            # Edit the dataframe to add host info
-                            report_csv['IP Address'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('host-ip', ''), axis=1) 
-                            report_csv['FQDN'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('host-fqdn', ''), axis=1) 
-                            report_csv['NetBios'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('netbios-name', ''), axis=1) 
-                            report_csv['OS'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('operating-system', ''), axis=1) 
-                            report_csv['Mac Address'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('mac-address', ''), axis=1) 
+                                # Edit the dataframe to add host info
+                                report_csv['IP Address'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('host-ip', ''), axis=1) 
+                                report_csv['FQDN'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('host-fqdn', ''), axis=1) 
+                                report_csv['NetBios'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('netbios-name', ''), axis=1) 
+                                report_csv['OS'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('operating-system', ''), axis=1) 
+                                report_csv['Mac Address'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('mac-address', ''), axis=1) 
 
-                            self.logger.info('Added host info for {} hosts'.format(len(host_list)))
+                                self.logger.debug('Added host info for {} hosts'.format(len(host_list)))
+                                spinner.ok("✅")
 
                         # Iterate over report lines and creates documents
-                        self.logger.info('Creating documents for {} {} findings.'.format(report_csv.shape[0], self.CONFIG_SECTION))
-                        try:
-                            # Iterate over report rows
-                            for index, finding in report_csv.iterrows():
-                                # Add document from finding
-                                self.nessuselk.add_to_queue(scan, finding)
+                        with yaspin(text='Creating documents for {} {} findings.'.format(report_csv.shape[0], self.CONFIG_SECTION), color="cyan") as spinner:
 
-                             # When document batch is ready, push it
-                            self.nessuselk.push_queue()
+                            try:
+                                for index, finding in report_csv.iterrows():
+                                    # Add document from finding
+                                    self.nessuselk.add_to_queue(scan, finding)
 
-                        except Exception as e:
-                            self.logger.error('{} finding push error: {}'.format(self.CONFIG_SECTION, e))   
+                            except Exception as e:
+                                self.logger.error('{} document creation error: {}'.format(self.CONFIG_SECTION, e))   
+
+                            spinner.ok("✅")
+
+                        # When document queue is ready, push it
+                        with yaspin(text="Pushing documents", color="cyan") as spinner:
+                            try:
+                                self.nessuselk.push_queue()
+                                
+                            except Exception as e:
+                                self.logger.error('{} document queue push error: {}'.format(self.CONFIG_SECTION, e))   
+
+                                spinner.ok("✅")
 
                         # Save the scan in ScanWhisperer DB
                         record_meta = (

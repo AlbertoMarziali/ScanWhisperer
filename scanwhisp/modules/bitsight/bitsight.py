@@ -13,6 +13,8 @@ import logging
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+from yaspin import yaspin
+
 
 class scanWhispererBitSight(scanWhispererBase):
     CONFIG_SECTION = None
@@ -63,6 +65,7 @@ class scanWhispererBitSight(scanWhispererBase):
                             BitSightELK( host=self.elk_host,
                                          username=self.elk_username,
                                          password=self.elk_password,
+                                         verbose=verbose
                                         )
 
                         self.bitsightelk_connect = True
@@ -83,28 +86,37 @@ class scanWhispererBitSight(scanWhispererBase):
         if self.bitsightapi_connect and self.bitsightelk_connect:
             # Update all reports
             try:
-                try:
-                    # Get companies via API
-                    for company in self.bitsightapi.get_companies():
-                        self.logger.info('Processing company: {}'.format(company.get('name')))
+                # Get companies via API
+                for company in self.bitsightapi.get_companies():
 
-                        # For each company, get findings and create documents
-                        self.bitsightapi.get_findings(company, self.bitsightelk.add_to_queue)
+                    self.logger.info('Processing company: {}'.format(company.get('name')))
 
-                        # Push documents to Elastic Search
-                        self.bitsightelk.push_queue()
+                    # For each company, get findings and create documents
+                    with yaspin(text="Fetching findings and creating documents", color="cyan") as spinner:
+                        try:
+                            self.bitsightapi.get_findings(company, self.bitsightelk.add_to_queue)
+                        except Exception as e:
+                            self.logger.error('{} document creation error: {}'.format(self.CONFIG_SECTION, e))
 
-                        # Company one
-                        self.logger.info('Done')
+                        spinner.ok("✅")
 
-                    # Done
-                    self.logger.info('All jobs done!')
+                    # Push documents to Elastic Search
+                    with yaspin(text="Pushing documents", color="cyan") as spinner:
+                        try:
+                            self.bitsightelk.push_queue()
+                        except Exception as e:
+                            self.logger.error('{} document queue push error: {}'.format(self.CONFIG_SECTION, e))   
+                            
+                        spinner.ok("✅")
 
-                except Exception as e:
-                    self.logger.error('Failed to process BitSight reports: {}'.format(e)) 
+                    # Company done
+                    self.logger.info('Done')
+
+                # Done
+                self.logger.info('All jobs done!')
 
             except Exception as e:
-                self.logger.error('Failed to cleanup index "scanwhisperer-bitsight" from Elastic Search: {}'.format(e))
+                self.logger.error('Failed to process BitSight reports: {}'.format(e)) 
 
         else:
             self.logger.error('Connection to BitSight unavailable.')
