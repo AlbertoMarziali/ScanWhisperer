@@ -12,9 +12,6 @@ from ...modules.niktowrapper.niktowrapperelk import NiktoWrapperELK
 import logging
 import io
 import pandas as pd
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 
 
 class scanWhispererNiktoWrapper(scanWhispererBase):

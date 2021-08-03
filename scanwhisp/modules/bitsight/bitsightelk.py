@@ -7,8 +7,9 @@ import copy
 from geoip import geolite2
 
 from elasticsearch import Elasticsearch
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+import warnings
+warnings.filterwarnings("ignore")
 
 class BitSightELK(object):
 

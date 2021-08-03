@@ -4,8 +4,9 @@ from datetime import datetime
 
 import hashlib
 from elasticsearch import Elasticsearch
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+import warnings
+warnings.filterwarnings("ignore")
 
 class NessusELK(object):
 

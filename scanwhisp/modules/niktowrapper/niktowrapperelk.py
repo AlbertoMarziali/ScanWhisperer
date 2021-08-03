@@ -5,8 +5,10 @@ from datetime import datetime
 from geoip import geolite2
 import hashlib
 from elasticsearch import Elasticsearch
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+import warnings
+warnings.filterwarnings("ignore")
+
 
 class NiktoWrapperELK(object):
 

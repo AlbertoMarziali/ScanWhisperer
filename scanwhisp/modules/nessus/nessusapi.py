@@ -7,9 +7,6 @@ from datetime import datetime
 
 import pytz
 import requests
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
-
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 class NessusAPI(object):
