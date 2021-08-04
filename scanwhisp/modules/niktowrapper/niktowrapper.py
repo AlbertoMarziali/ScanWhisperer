@@ -4,8 +4,7 @@ from __future__ import absolute_import
 
 __author__ = 'Alberto Marziali'
 
-from ...base.config import swConfig
-from ...whisperer.base import scanWhispererBase
+from ...base.base import scanWhispererBase
 from ...modules.niktowrapper.niktowrappers3 import NiktoWrapperS3
 from ...modules.niktowrapper.niktowrapperelk import NiktoWrapperELK
 
@@ -70,7 +69,8 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
                         self.logger.info('Attempting to connect to Elastic Search ({})'.format(self.elk_host))
                         self.niktowrapperelk = NiktoWrapperELK( host=self.elk_host,
                                                                 username=self.elk_username,
-                                                                password=self.elk_password)
+                                                                password=self.elk_password,
+                                                                verbose=verbose)
 
                         self.niktowrapperelk_connect = True
                         self.logger.info('Connected to Elastic Search ({})'.format(self.elk_host))
@@ -105,18 +105,23 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
 
                         # Download the file from S3     
                         with yaspin(text="Downloading report", color="cyan") as spinner:
-                            report_csv = pd.read_csv(io.StringIO(self.niktowrappers3.download_file(remote_file_name)), na_filter=False)
+                            try:
+                                report_csv = pd.read_csv(io.StringIO(self.niktowrappers3.download_file(remote_file_name)), na_filter=False)
+                            except Exception as e:
+                                self.logger.error('niktowrapper findings download failed: {}'.format(e))  
+                                return
 
                             spinner.ok("✅")
                         
                         # Iterate over report lines and push it to Elastic Search
-                        with yaspin(text='Creating documents for {} {} findings.'.format(report_csv.shape[0], self.CONFIG_SECTION), color="cyan") as spinner:
+                        with yaspin(text='Creating documents for {} niktowrapper findings.'.format(report_csv.shape[0]), color="cyan") as spinner:
                             try:
                                 # Iterate over report rows
                                 for index, finding in report_csv.iterrows():
                                     self.niktowrapperelk.add_to_queue(finding)
                             except Exception as e:
-                                self.logger.error('{} document creation error: {}'.format(self.CONFIG_SECTION, e))   
+                                self.logger.error('niktowrapper document creation failed: {}'.format(e))   
+                                return
 
                             spinner.ok("✅")
                         
@@ -125,11 +130,12 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
                             try:
                                 self.niktowrapperelk.push_queue()  
                             except Exception as e:
-                                self.logger.error('{} document queue push error: {}'.format(self.CONFIG_SECTION, e))   
+                                self.logger.error('niktowrapper document queue push failed: {}'.format(e))   
+                                return
 
                             spinner.ok("✅")
 
-                        self.logger.debug('{} {} records whispered to Elastic Search'.format(report_csv.shape[0], self.CONFIG_SECTION))
+                        self.logger.debug('{} niktowrapper records whispered to Elastic Search'.format(report_csv.shape[0]))
 
                         # Delete the file from S3
                         self.niktowrappers3.delete_file(remote_file_name)

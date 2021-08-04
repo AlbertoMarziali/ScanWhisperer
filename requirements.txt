@@ -14,3 +14,4 @@ boto3
 elasticsearch
 python-geoip-python3
 python-geoip-geolite2
+yaspin

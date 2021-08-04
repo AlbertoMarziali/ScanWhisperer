@@ -1,28 +1,16 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-from six.moves import range
-from functools import reduce
 
 __author__ = 'Austin Taylor'
 
 from .base.config import swConfig
 from .modules.nessus.nessus import scanWhispererNessus
-from .whisperer.awsinspector import scanWhispererAWSInspector
+from .modules.awsinspector.awsinspector import scanWhispererAWSInspector
 from .modules.niktowrapper.niktowrapper import scanWhispererNiktoWrapper
 from .modules.bitsight.bitsight import scanWhispererBitSight
 
-import pandas as pd
-from lxml import objectify
-import sys
-import os
-import io
-import time
-import sqlite3
-import json
 import logging
-import socket
-from datetime import datetime
 
 
 class scanWhisperer(object):

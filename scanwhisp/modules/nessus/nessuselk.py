@@ -8,6 +8,7 @@ from elasticsearch import Elasticsearch
 import warnings
 warnings.filterwarnings("ignore")
 
+
 class NessusELK(object):
 
     def __init__(self, verbose = False, profile=None, username=None, password=None, host=None):

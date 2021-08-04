@@ -1,18 +1,14 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-from six.moves import range
-from functools import reduce
 
 __author__ = 'Alberto Marziali'
 
-from ...base.config import swConfig
-from ...whisperer.base import scanWhispererBase
+from ...base.base import scanWhispererBase
 from ...modules.nessus.nessusapi import NessusAPI
 from ...modules.nessus.nessuselk import NessusELK
 
 import pandas as pd
-from lxml import objectify
 import io
 import time
 import logging
@@ -72,7 +68,8 @@ class scanWhispererNessus(scanWhispererBase):
                                    hostname=self.nessus_hostname,
                                    port=self.nessus_port,
                                    access_key=self.access_key,
-                                   secret_key=self.secret_key
+                                   secret_key=self.secret_key,
+                                   verbose=verbose
                                   )
                     self.nessusapi_connect = True
                     self.logger.info('Connected to {} on {host}:{port}'.format(self.CONFIG_SECTION, host=self.nessus_hostname,port=str(self.nessus_port)))
@@ -152,21 +149,24 @@ class scanWhispererNessus(scanWhispererBase):
                 # for each scan to process, download csv report and export to Elastic Search
                 for scan in scan_list:
                     
-                    # Try to request scan report
-                    try:
-                        # Start
-                        self.logger.info('Processing {} scan {}, (history {})'.format(self.CONFIG_SECTION, scan['scan_id'], scan['history_id']))
+                    # Start
+                    self.logger.info('Processing {} scan {}, (history {})'.format(self.CONFIG_SECTION, scan['scan_id'], scan['history_id']))
 
-                        # Download the scan report and import inside a DataFrame
-                        with yaspin(text="Downloading findings", color="cyan") as spinner:
+                    # Download the scan report and import inside a DataFrame
+                    with yaspin(text="Downloading findings", color="cyan") as spinner:
+                        try:
                             report_req = self.nessusapi.download_scan(scan_id=scan['scan_id'], history=scan['history_id'], export_format='csv')
                             report_csv = pd.read_csv(io.StringIO(report_req), na_filter=False)
-                            spinner.ok("✅")
+                        except Exception as e:
+                            self.logger.error('{} findings download failed: {}'.format(self.CONFIG_SECTION, e))  
+                            return
+                        
+                        spinner.ok("✅")
 
-                        # ONLY FOR NESSUS: Add Host info
-                        if len(report_csv) > 0 and self.CONFIG_SECTION == 'nessus':
-                            
-                            with yaspin(text="Fetching host info", color="cyan") as spinner:
+                    # ONLY FOR NESSUS: Add Host info
+                    if len(report_csv) > 0 and self.CONFIG_SECTION == 'nessus':       
+                        with yaspin(text="Fetching host info", color="cyan") as spinner:
+                            try:
                                 host_list = self.nessusapi.get_scan_hosts(scan_id=scan['scan_id'], history_id=scan['history_id'])
 
                                 # Edit the dataframe to add host info
@@ -177,50 +177,52 @@ class scanWhispererNessus(scanWhispererBase):
                                 report_csv['Mac Address'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('mac-address', ''), axis=1) 
 
                                 self.logger.debug('Added host info for {} hosts'.format(len(host_list)))
-                                spinner.ok("✅")
-
-                        # Iterate over report lines and creates documents
-                        with yaspin(text='Creating documents for {} {} findings.'.format(report_csv.shape[0], self.CONFIG_SECTION), color="cyan") as spinner:
-
-                            try:
-                                for index, finding in report_csv.iterrows():
-                                    # Add document from finding
-                                    self.nessuselk.add_to_queue(scan, finding)
-
                             except Exception as e:
-                                self.logger.error('{} document creation error: {}'.format(self.CONFIG_SECTION, e))   
+                                self.logger.error('{} host info download failed: {}'.format(self.CONFIG_SECTION, e))   
+                                return
 
                             spinner.ok("✅")
 
-                        # When document queue is ready, push it
-                        with yaspin(text="Pushing documents", color="cyan") as spinner:
-                            try:
-                                self.nessuselk.push_queue()
-                                
-                            except Exception as e:
-                                self.logger.error('{} document queue push error: {}'.format(self.CONFIG_SECTION, e))   
+                    # Iterate over report lines and creates documents
+                    with yaspin(text='Creating documents for {} {} findings.'.format(report_csv.shape[0], self.CONFIG_SECTION), color="cyan") as spinner:
+                        try:
+                            for index, finding in report_csv.iterrows():
+                                # Add document from finding
+                                self.nessuselk.add_to_queue(scan, finding)
 
-                                spinner.ok("✅")
+                        except Exception as e:
+                            self.logger.error('{} document creation failed: {}'.format(self.CONFIG_SECTION, e))   
+                            return
 
-                        # Save the scan in ScanWhisperer DB
-                        record_meta = (
-                                scan['scan_name'],
-                                scan['scan_id'],
-                                scan['norm_time'],
-                                'file_name',
-                                time.time(),
-                                report_csv.shape[0],
-                                self.CONFIG_SECTION,
-                                scan['uuid'],
-                                1,
-                                0,
-                            )
-                        self.record_insert(record_meta)
+                        spinner.ok("✅")
 
-                        self.logger.info('Scan processed successfully.')   
+                    # When document queue is ready, push it
+                    with yaspin(text="Pushing documents", color="cyan") as spinner:
+                        try:
+                            self.nessuselk.push_queue()
+                            
+                        except Exception as e:
+                            self.logger.error('{} document queue push failed: {}'.format(self.CONFIG_SECTION, e))  
+                            return 
 
-                    except Exception as e:
-                        self.logger.error('Could not download {} scan {}: {}'.format(self.CONFIG_SECTION, scan['scan_id'], e))
+                        spinner.ok("✅")
+
+                    # Save the scan in ScanWhisperer DB
+                    record_meta = (
+                            scan['scan_name'],
+                            scan['scan_id'],
+                            scan['norm_time'],
+                            'file_name',
+                            time.time(),
+                            report_csv.shape[0],
+                            self.CONFIG_SECTION,
+                            scan['uuid'],
+                            1,
+                            0,
+                        )
+                    self.record_insert(record_meta)
+
+                    self.logger.info('Scan processed successfully.')   
 
             except Exception as e:
                 self.logger.error('Could not process new {} scans: {}'.format(self.CONFIG_SECTION, e))

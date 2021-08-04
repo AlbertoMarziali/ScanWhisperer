@@ -1,12 +1,7 @@
 from __future__ import absolute_import
-import json
 import logging
-import sys
-import time
-from datetime import datetime
 
 import requests
-import json
 
 
 class BitSightAPI(object):
@@ -18,7 +13,6 @@ class BitSightAPI(object):
         if not all((api_key)):
             raise Exception('ERROR: API key')
 
-        self.verbose = verbose
         self.api_key = api_key
 
         # Token check

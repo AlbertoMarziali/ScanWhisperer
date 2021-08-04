@@ -1,23 +1,15 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-from six.moves import range
 from functools import reduce
 
 __author__ = 'Austin Taylor'
 
 from ..base.config import swConfig
-import pandas as pd
-from lxml import objectify
 import sys
 import os
-import io
-import time
 import sqlite3
-import json
 import logging
-import socket
-from datetime import datetime
 
 
 class scanWhispererBase(object):

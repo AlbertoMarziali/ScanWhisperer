@@ -10,11 +10,17 @@ import boto3 #AWS Python SDK
 
 class AWSInspectorAPI(object):
 
-    def __init__(self, verbose=False, region_name=None, access_key=None, secret_key=None):
+    def __init__(self, 
+                verbose=False, 
+                region_name=None, 
+                inspector_access_key=None, 
+                inspector_secret_key=None, 
+                organization_access_key=None, 
+                organization_secret_key=None):
         self.logger = logging.getLogger('AWSInspectorAPI')
         if verbose:
             self.logger.setLevel(logging.DEBUG)
-        if not all((region_name, access_key, secret_key)):
+        if not all((region_name, inspector_access_key, inspector_secret_key, organization_access_key, organization_secret_key)):
             raise Exception('ERROR: Region or API keys.')
 
         self.verbose = verbose
@@ -22,15 +28,27 @@ class AWSInspectorAPI(object):
         # setup cache dict for rule packages names
         self.rulepackagecache = {}
 
+        # setup inspector client
         self.inspector = boto3.client(
             'inspector',
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
+            aws_access_key_id=inspector_access_key,
+            aws_secret_access_key=inspector_secret_key,
             region_name = region_name
         )
 
+        # prepare scan lists
         self.scans = self.get_scans()
         self.scan_ids = self.get_scan_arns()
+
+        # setup organizations client
+        self.organization = boto3.client('organizations',
+            aws_access_key_id=organization_access_key,
+            aws_secret_access_key=organization_secret_key,
+            region_name = region_name
+        )
+
+        # prepare account list
+        self.aws_accounts = self.get_accounts() 
 
 
     def get_scans(self):
@@ -105,3 +123,19 @@ class AWSInspectorAPI(object):
             self.rulepackagecache[rule_arn] = ret
         
         return ret
+
+    
+    def get_accounts(self):
+        accounts = {}
+
+        # get account list via API
+        paginator = self.organization.get_paginator('list_accounts')
+
+        # loop through responses
+        for response in paginator.paginate():
+            if response.get('Accounts'):
+                # take account list from result
+                for account in response.get('Accounts'):
+                    accounts[account.get('Id')] = account.get('Name')
+        
+        return accounts

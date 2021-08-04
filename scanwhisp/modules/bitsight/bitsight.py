@@ -4,8 +4,7 @@ from __future__ import absolute_import
 
 __author__ = 'Alberto Marziali'
 
-from ...base.config import swConfig
-from ...whisperer.base import scanWhispererBase
+from ...base.base import scanWhispererBase
 from ...modules.bitsight.bitsightapi import BitSightAPI
 from ...modules.bitsight.bitsightelk import BitSightELK
 
@@ -53,7 +52,8 @@ class scanWhispererBitSight(scanWhispererBase):
                 try:
                     # Try to connect to S3
                     self.logger.info('Attempting to connect to BitSight')
-                    self.bitsightapi = BitSightAPI(api_key=self.api_key)
+                    self.bitsightapi = BitSightAPI( api_key=self.api_key,
+                                                    verbose=verbose)
 
                     self.bitsightapi_connect = True
                     self.logger.info('Connected to BitSight')
@@ -96,7 +96,8 @@ class scanWhispererBitSight(scanWhispererBase):
                         try:
                             self.bitsightapi.get_findings(company, self.bitsightelk.add_to_queue)
                         except Exception as e:
-                            self.logger.error('{} document creation error: {}'.format(self.CONFIG_SECTION, e))
+                            self.logger.error('{} document creation failed: {}'.format(self.CONFIG_SECTION, e))
+                            return
 
                         spinner.ok("✅")
 
@@ -105,7 +106,8 @@ class scanWhispererBitSight(scanWhispererBase):
                         try:
                             self.bitsightelk.push_queue()
                         except Exception as e:
-                            self.logger.error('{} document queue push error: {}'.format(self.CONFIG_SECTION, e))   
+                            self.logger.error('{} document queue push failed: {}'.format(self.CONFIG_SECTION, e))   
+                            return
                             
                         spinner.ok("✅")
 
