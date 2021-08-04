@@ -5,8 +5,8 @@ from __future__ import absolute_import
 __author__ = 'Alberto Marziali'
 
 from ...base.base import scanWhispererBase
-from ...modules.nessus.nessusapi import NessusAPI
-from ...modules.nessus.nessuselk import NessusELK
+from ...modules.tenableio.tenableioapi import TenableioAPI
+from ...modules.tenableio.tenableioelk import TenableioELK
 
 import pandas as pd
 import io
@@ -16,12 +16,12 @@ import logging
 from yaspin import yaspin
 
 
-class scanWhispererNessus(scanWhispererBase):
+class scanWhispererTenableio(scanWhispererBase):
     CONFIG_SECTION = None
 
     def __init__(
             self,
-            profile='nessus',
+            profile='tenableio',
             config=None,
             db_name='report_tracker.db',
             purge=False,
@@ -29,29 +29,27 @@ class scanWhispererNessus(scanWhispererBase):
     ):
         self.CONFIG_SECTION = profile
 
-        super(scanWhispererNessus, self).__init__(config=config,purge=purge)
+        super(scanWhispererTenableio, self).__init__(config=config,purge=purge)
 
         self.develop = True
         self.purge = purge
         self.verbose = verbose
 
         # set up logger
-        self.logger = logging.getLogger('scanWhispererNessus')
+        self.logger = logging.getLogger('scanWhispererTenableio')
         if verbose:
             self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('Starting Nessus whisperer')
+        self.logger.info('Starting Tenable.io whisperer')
 
         # if the config is available
         if config is not None:
             try:
                 # Try to read data from config file
-                # Nessus/Tenable.io data
-                self.nessus_hostname = self.config.get(self.CONFIG_SECTION, 'hostname')
-                self.nessus_port = self.config.get(self.CONFIG_SECTION, 'port')
-                self.nessus_trash = self.config.getbool(self.CONFIG_SECTION, 'trash')
+                # Tenable.io data
+                self.tenableio_trash = self.config.getbool(self.CONFIG_SECTION, 'trash')
 
-                # Nessus/Tenable.io API Keys
+                # Tenable.io API Keys
                 self.access_key = self.config.get(self.CONFIG_SECTION, 'access_key')
                 self.secret_key = self.config.get(self.CONFIG_SECTION, 'secret_key')
 
@@ -61,35 +59,33 @@ class scanWhispererNessus(scanWhispererBase):
                 self.elk_password = self.config.get(self.CONFIG_SECTION, 'elk_password')
 
                 try:
-                    # Try to connect to Nessus
-                    self.logger.info('Attempting to connect to Nessus')
-                    self.nessusapi = \
-                        NessusAPI( hostname=self.nessus_hostname,
-                                   port=self.nessus_port,
-                                   access_key=self.access_key,
-                                   secret_key=self.secret_key,
-                                   verbose=verbose
+                    # Try to connect to Tenableio
+                    self.logger.info('Attempting to connect to Tenable.io...')
+                    self.tenableioapi = \
+                        TenableioAPI(   access_key=self.access_key,
+                                        secret_key=self.secret_key,
+                                        verbose=verbose
                                   )
-                    self.nessusapi_connect = True
-                    self.logger.info('Connected to Nessus on {host}:{port}'.format(host=self.nessus_hostname,port=str(self.nessus_port)))
+                    self.tenableioapi_connect = True
+                    self.logger.info('Connected to Tenable.io')
 
                     try:
                         # Try to connect to Elastic Search
                         self.logger.info('Attempting to connect to Elastic Search ({})'.format(self.elk_host))
-                        self.nessuselk = \
-                            NessusELK(  host=self.elk_host,
-                                        username=self.elk_username,
-                                        password=self.elk_password,
-                                        verbose=verbose
+                        self.tenableioelk = \
+                            TenableioELK(   host=self.elk_host,
+                                            username=self.elk_username,
+                                            password=self.elk_password,
+                                            verbose=verbose
                                     )
-                        self.nessuselk_connect = True
+                        self.tenableioelk_connect = True
                         self.logger.info('Connected to Elastic Search ({})'.format(self.elk_host))
 
                     except Exception as e:
                         self.logger.error('Could not connect to Elastic Search ({}): {}'.format(self.elk_host, e))
 
                 except Exception as e:
-                    self.logger.error('Could not connect to Nessus: {}'.format(e))
+                    self.logger.error('Could not connect to Tenable.io: {}'.format(e))
 
             except Exception as e:
                 self.logger.error('Could not properly load your config: {}'.format(e))
@@ -110,12 +106,12 @@ class scanWhispererNessus(scanWhispererBase):
                 record['timezone'] = s.get('timezone', '')
                 record['folder_id'] = s.get('folder_id', '')
                 try:
-                    for h in self.nessusapi.get_scan_history(s['id']):
+                    for h in self.tenableioapi.get_scan_history(s['id']):
                         record['uuid'] = h.get('uuid', '')
                         record['status'] = h.get('status', '')
                         record['history_id'] = h.get('history_id', '')
                         record['last_modification_date'] = h.get('last_modification_date', '')
-                        record['norm_time'] = self.nessusapi.get_utc_from_local(int(record['last_modification_date']), local_tz=record['timezone'])
+                        record['norm_time'] = self.tenableioapi.get_utc_from_local(int(record['last_modification_date']), local_tz=record['timezone'])
                     
                         scans_to_process.append(record.copy())
                 except:
@@ -133,11 +129,11 @@ class scanWhispererNessus(scanWhispererBase):
         return scans_to_process
 
 
-    def whisper_nessus(self):
-        if self.nessusapi_connect and self.nessuselk_connect:
-            # get scan list from nessus/tenableio, avoiding already fetched scans (if failed, throw an exception)
+    def whisper_tenableio(self):
+        if self.tenableioapi_connect and self.tenableioelk_connect:
+            # get scan list from tenableio/tenableio, avoiding already fetched scans (if failed, throw an exception)
             try:
-                scan_list = self.get_scans_to_process(self.nessusapi.scans['scans'])
+                scan_list = self.get_scans_to_process(self.tenableioapi.scans['scans'])
 
                 # if no scans are available, just exit
                 if not scan_list:
@@ -148,48 +144,28 @@ class scanWhispererNessus(scanWhispererBase):
                 for scan in scan_list:
                     
                     # Start
-                    self.logger.info('Processing Nessus scan {}, (history {})'.format(scan['scan_id'], scan['history_id']))
+                    self.logger.info('Processing Tenable.io scan {}, (history {})'.format(scan['scan_id'], scan['history_id']))
 
                     # Download the scan report and import inside a DataFrame
                     with yaspin(text="Downloading findings", color="cyan") as spinner:
                         try:
-                            report_req = self.nessusapi.download_scan(scan_id=scan['scan_id'], history=scan['history_id'], export_format='csv')
+                            report_req = self.tenableioapi.download_scan(scan_id=scan['scan_id'], history=scan['history_id'], export_format='csv')
                             report_csv = pd.read_csv(io.StringIO(report_req), na_filter=False)
                         except Exception as e:
-                            self.logger.error('Nessus findings download failed: {}'.format(e))  
+                            self.logger.error('Tenable.io findings download failed: {}'.format(e))  
                             return
                         
                         spinner.ok("✅")
 
-                    # ONLY FOR NESSUS: Add Host info
-                    if len(report_csv) > 0:
-                        with yaspin(text="Fetching host info", color="cyan") as spinner:
-                            try:
-                                host_list = self.nessusapi.get_scan_hosts(scan_id=scan['scan_id'], history_id=scan['history_id'])
-
-                                # Edit the dataframe to add host info
-                                report_csv['IP Address'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('host-ip', ''), axis=1) 
-                                report_csv['FQDN'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('host-fqdn', ''), axis=1) 
-                                report_csv['NetBios'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('netbios-name', ''), axis=1) 
-                                report_csv['OS'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('operating-system', ''), axis=1) 
-                                report_csv['Mac Address'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('mac-address', ''), axis=1) 
-
-                                self.logger.debug('Added host info for {} hosts'.format(len(host_list)))
-                            except Exception as e:
-                                self.logger.error('Host info download failed: {}'.format(e))   
-                                return
-
-                            spinner.ok("✅")
-
                     # Iterate over report lines and creates documents
-                    with yaspin(text='Creating documents for {} Nessus findings.'.format(report_csv.shape[0]), color="cyan") as spinner:
+                    with yaspin(text='Creating documents for {} Tenable.io findings.'.format(report_csv.shape[0]), color="cyan") as spinner:
                         try:
                             for index, finding in report_csv.iterrows():
                                 # Add document from finding
-                                self.nessuselk.add_to_queue(scan, finding)
+                                self.tenableioelk.add_to_queue(scan, finding)
 
                         except Exception as e:
-                            self.logger.error('Nessus document creation failed: {}'.format(e))   
+                            self.logger.error('Tenable.io document creation failed: {}'.format(e))   
                             return
 
                         spinner.ok("✅")
@@ -197,10 +173,10 @@ class scanWhispererNessus(scanWhispererBase):
                     # When document queue is ready, push it
                     with yaspin(text="Pushing documents", color="cyan") as spinner:
                         try:
-                            self.nessuselk.push_queue()
+                            self.tenableioelk.push_queue()
                             
                         except Exception as e:
-                            self.logger.error('Nessus document queue push failed: {}'.format(e))  
+                            self.logger.error('Tenable.io document queue push failed: {}'.format(e))  
                             return 
 
                         spinner.ok("✅")
@@ -223,12 +199,12 @@ class scanWhispererNessus(scanWhispererBase):
                     self.logger.info('Scan processed successfully.')   
 
             except Exception as e:
-                self.logger.error('Could not process new Nessus scans: {}'.format(e))
+                self.logger.error('Could not process new Tenable.io scans: {}'.format(e))
                             
             self.conn.close()
             self.logger.info('Scan aggregation completed!')
         else:
-            self.logger.error('Failed to connect to Nessus API at {}:{}'.format(self.nessus_hostname, self.nessus_port))
+            self.logger.error('Failed to connect to Tenable.io API')
             self.exit_code += 1
         return self.exit_code
 

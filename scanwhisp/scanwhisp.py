@@ -6,6 +6,7 @@ __author__ = 'Austin Taylor'
 
 from .base.config import swConfig
 from .modules.nessus.nessus import scanWhispererNessus
+from .modules.tenableio.tenableio import scanWhispererTenableio
 from .modules.awsinspector.awsinspector import scanWhispererAWSInspector
 from .modules.niktowrapper.niktowrapper import scanWhispererNiktoWrapper
 from .modules.bitsight.bitsight import scanWhispererBitSight
@@ -44,12 +45,12 @@ class scanWhisperer(object):
                 self.exit_code += sw.whisper_nessus()
 
         elif self.profile == 'tenableio':
-            sw = scanWhispererNessus(config=self.config,
+            sw = scanWhispererTenableio(config=self.config,
                                      profile=self.profile,
                                      verbose=self.verbose,
                                      purge=self.purge)
             if sw:
-                self.exit_code += sw.whisper_nessus()
+                self.exit_code += sw.whisper_tenableio()
 
         elif self.profile == 'awsinspector':
             sw = scanWhispererAWSInspector(config=self.config,

@@ -9,13 +9,13 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-class NessusELK(object):
+class TenableioELK(object):
 
     def __init__(self, verbose = False, username=None, password=None, host=None):
-        self.logger = logging.getLogger('NessusELK')
+        self.logger = logging.getLogger('TenableioELK')
         if verbose:
             self.logger.setLevel(logging.DEBUG)
-
+   
         self.username = username
         self.password = password
         self.host = host
@@ -40,32 +40,41 @@ class NessusELK(object):
     # This function creates a single document
     def create_document(self, scan, finding):
         # assemble document: 
-        # NESSUS: Plugin ID,CVE,CVSS,Risk,Host,Protocol,Port,Name,Synopsis,Description,Solution,See Also,Plugin Output
-        # TENABLEIO: Plugin ID,CVE,CVSS,Risk,Host,Protocol,Port,Name,Synopsis,Description,Solution,See Also,Plugin Output,Asset UUID,Vulnerability State,IP Address,FQDN,NetBios,OS,MAC Address,Plugin Family,CVSS Base Score,CVSS Temporal Score,CVSS Temporal Vector,CVSS Vector,CVSS3 Base Score,CVSS3 Temporal Score,CVSS3 Temporal Vector,CVSS3 Vector,System Type,Host Start,Host End
         document = {}
 
-        # ---- Nessus/Tenable.io only part
-        self.add_field_to_document(document, 'nessus.scan.name', scan.get('scan_name'))
-        self.add_field_to_document(document, 'nessus.scan.id', scan.get('scan_id'))
-        self.add_field_to_document(document, 'nessus.history.id', scan.get('history_id'))
-        self.add_field_to_document(document, 'nessus.plugin.id', finding.get('Plugin ID'))
-        self.add_field_to_document(document, 'nessus.plugin.name', finding.get('Name'))
+        # ---- Tenable.io part
+        self.add_field_to_document(document, 'tenableio.scan.name', scan.get('scan_name'))
+        self.add_field_to_document(document, 'tenableio.scan.id', scan.get('scan_id'))
+        self.add_field_to_document(document, 'tenableio.history.id', scan.get('history_id'))
+        self.add_field_to_document(document, 'tenableio.plugin.id', finding.get('Plugin ID'))
+        self.add_field_to_document(document, 'tenableio.plugin.name', finding.get('Name'))
+        self.add_field_to_document(document, 'tenableio.plugin.family', finding.get('Plugin Family')) 
 
         # ---- Asset part ----
         self.add_field_to_document(document, 'asset.host', finding.get('Host'))
         self.add_field_to_document(document, 'asset.ip', finding.get('IP Address')) 
         self.add_field_to_document(document, 'asset.port', finding.get('Port'))   
         self.add_field_to_document(document, 'asset.protocol', finding.get('Protocol'))
+        self.add_field_to_document(document, 'asset.uuid', finding.get('Asset UUID')) 
         self.add_field_to_document(document, 'asset.fqdn', finding.get('FQDN')) 
         self.add_field_to_document(document, 'asset.netbios', finding.get('NetBios')) 
         self.add_field_to_document(document, 'asset.os', finding.get('OS')) 
         self.add_field_to_document(document, 'asset.mac_address', finding.get('Mac Address')) 
+        self.add_field_to_document(document, 'asset.system_type', finding.get('System Type')) 
 
         # ---- CVE Part ----
         self.add_field_to_document(document, 'cve.id', finding.get('CVE')) 
         self.add_field_to_document(document, 'cve.cvss.score', finding.get('CVSS')) 
+        self.add_field_to_document(document, 'cve.cvss.vector', finding.get('CVSS Vector'))  
         self.add_field_to_document(document, 'cve.cvss2.score', finding.get('CVSS')) 
-
+        self.add_field_to_document(document, 'cve.cvss.base.score', finding.get('CVSS Base Score'))  
+        self.add_field_to_document(document, 'cve.cvss.temporal.score', finding.get('CVSS Temporal Score'))  
+        self.add_field_to_document(document, 'cve.cvss.temporal.vector', finding.get('CVSS Temporal Vector'))  
+        self.add_field_to_document(document, 'cve.cvss3.score', finding.get('CVSS3 Base Score')) 
+        self.add_field_to_document(document, 'cve.cvss3.vector', finding.get('CVSS3 Vector'))  
+        self.add_field_to_document(document, 'cve.cvss3.base.score', finding.get('CVSS3 Base Score')) 
+        self.add_field_to_document(document, 'cve.cvss3.temporal.score', finding.get('CVSS3 Temporal Score')) 
+        self.add_field_to_document(document, 'cve.cvss3.temporal.vector', finding.get('CVSS3 Temporal Vector'))  
         if document.get('cve.cvss.score'):
             self.add_field_to_document(document, 'cve.package_name', finding.get('Name'))  
 
@@ -76,9 +85,10 @@ class NessusELK(object):
         self.add_field_to_document(document, 'finding.title', finding.get('Synopsis'))
         self.add_field_to_document(document, 'finding.description', finding.get('Description'))
         self.add_field_to_document(document, 'finding.solution', finding.get('Solution'))
-        self.add_field_to_document(document, 'finding.source', 'nessus')
+        self.add_field_to_document(document, 'finding.source', 'tenableio')
         self.add_field_to_document(document, 'finding.plugin_output', finding.get('Plugin Output'))
         self.add_field_to_document(document, 'finding.see_also', finding.get('See Also'))
+        self.add_field_to_document(document, 'finding.state', finding.get('Vulnerability State')) 
         # Guess finding type by existing fields
         if document.get('cve.cvss.score'):
             self.add_field_to_document(document, 'finding.type', 'cve')
@@ -95,7 +105,7 @@ class NessusELK(object):
         document = self.create_document(scan, finding)
 
         # Create Document ID
-        document_id = hashlib.sha1(('{}{}{}'.format(document.get('asset.ip'), document.get('asset.port'), document.get('nessus.plugin.id'))).encode('utf-8')).hexdigest()
+        document_id = hashlib.sha1(('{}{}{}'.format(document.get('asset.ip'), document.get('asset.port'), document.get('tenableio.plugin.id'))).encode('utf-8')).hexdigest()
 
         # Check if the document is already in the queue
         if self.document_queue.get(document_id):
@@ -117,7 +127,7 @@ class NessusELK(object):
     # Push documents to Elastic Search
     def push_queue(self):
 
-        self.logger.debug('Pushing {} Nessus documents.'.format(len(self.document_queue)))
+        self.logger.debug('Pushing {} Tenable.io documents.'.format(len(self.document_queue)))
 
         # Iterate over document queue
         for document_id, document in self.document_queue.items():
@@ -153,16 +163,16 @@ class NessusELK(object):
                         }
                     }
                 }
-                self.elastic_client.indices.create(index='scanwhisperer-{}-nessus'.format(document.get('finding.type')),body=mapping, ignore=400)
+                self.elastic_client.indices.create(index='scanwhisperer-{}-tenableio'.format(document.get('finding.type')),body=mapping, ignore=400)
 
             except Exception as e:
-                self.logger.error('Failed create index scanwhisperer-{}-nessus on Elastic Search: {}'.format(document.get('finding.type'), e)) 
+                self.logger.error('Failed create index scanwhisperer-{}-tenableio on Elastic Search: {}'.format(document.get('finding.type'), e)) 
             
             # Query Elastic Search to fetch a document with the same ID
             # If found,overwrite new first_observed with older to avoid updating it
             try:
                 # Fetch document
-                elk_response = self.elastic_client.search(index='scanwhisperer-{}-nessus'.format(document.get('finding.type')), body={
+                elk_response = self.elastic_client.search(index='scanwhisperer-{}-tenableio'.format(document.get('finding.type')), body={
                     "query": {
                         "match": {
                             "_id": document_id
@@ -181,12 +191,12 @@ class NessusELK(object):
             # Push document to Elastic
             try:
                 # push document
-                self.elastic_client.update(index='scanwhisperer-{}-nessus'.format(document.get('finding.type')), id=document_id, body={'doc': document,'doc_as_upsert':True})
+                self.elastic_client.update(index='scanwhisperer-{}-tenableio'.format(document.get('finding.type')), id=document_id, body={'doc': document,'doc_as_upsert':True})
             
             except Exception as e:
                 self.logger.error('Failed push document to Elastic Search: {}'.format(e)) 
 
-        self.logger.debug('Pushed {} Nessus documents to Elastic Search'.format(len(self.document_queue)))
+        self.logger.debug('Pushed {} Tenable.io documents to Elastic Search'.format(len(self.document_queue)))
 
         # Clear queue after push
         self.document_queue = {}

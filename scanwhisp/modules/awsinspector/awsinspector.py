@@ -57,7 +57,7 @@ class scanWhispererAWSInspector(scanWhispererBase):
 
                 # try to connect to AWS Inspector
                 try:
-                    self.logger.info('Attempting to connect to {}...'.format(self.CONFIG_SECTION))
+                    self.logger.info('Attempting to connect to AWS Inspector'.format(self.CONFIG_SECTION))
                     self.awsinspectorapi = \
                         AWSInspectorAPI(region_name=self.region_name,
                                   inspector_access_key=self.inspector_access_key,
