@@ -37,7 +37,7 @@ class scanWhispererAWSInspector(scanWhispererBase):
         if verbose:
             self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('Starting {} whisperer'.format(self.CONFIG_SECTION))
+        self.logger.info('\nStarting AWS Inspector whisperer')
 
         # if the config is available
         if config is not None:
@@ -103,7 +103,7 @@ class scanWhispererAWSInspector(scanWhispererBase):
         else:
             scans_to_process = latest_scans
 
-        self.logger.info('Identified {new} scans to be processed'.format(new=len(scans_to_process)))
+        self.logger.info('Identified {} scans to be processed'.format(len(scans_to_process)))
 
         return scans_to_process
 
@@ -123,40 +123,45 @@ class scanWhispererAWSInspector(scanWhispererBase):
                 for scan in scans:
 
                      # Start
-                    self.logger.info('Processing awsinspector scan {}'.format(scan['arn']))
+                    self.logger.info('Processing AWS Inspector scan {}'.format(scan['arn']))
 
                     # Download findings inside the scan
                     with yaspin(text="Downloading findings", color="cyan") as spinner:
                         try:
                             findings = self.awsinspectorapi.get_scan_findings(scan['arn'])
                         except Exception as e:
-                            self.logger.error('awsinspector findings download failed: {}'.format(e))   
+                            self.logger.error('AWS Inspector findings download failed: {}'.format(e))   
                             return
                         
                         spinner.ok("✅")
 
-                    # Cycle through every finding and create documents
-                    with yaspin(text="Creating documents from {} findings".format(len(findings)), color="cyan") as spinner:
-                        try:
-                            for finding in findings:
-                                self.awsinspectorelk.add_to_queue(scan, finding)
-                        except Exception as e:
-                            self.logger.error('awsinspector document creation failed: {}'.format(e))   
-                            return
+                    # Check if the scan contains some findings
+                    if len(findings) > 0:
 
-                        spinner.ok("✅")
+                        # Cycle through every finding and create documents
+                        with yaspin(text="Creating documents from {} findings".format(len(findings)), color="cyan") as spinner:
+                            try:
+                                for finding in findings:
+                                    self.awsinspectorelk.add_to_queue(scan, finding)
+                            except Exception as e:
+                                self.logger.error('AWS Inspector document creation failed: {}'.format(e))   
+                                return
 
-                    # When document queue is ready, push it
-                    with yaspin(text="Pushing documents", color="cyan") as spinner:
-                        try:
-                            self.awsinspectorelk.push_queue()
-                            
-                        except Exception as e:
-                            self.logger.error('awsinspector document queue push failed: {}'.format(e))  
-                            return 
+                            spinner.ok("✅")
 
-                        spinner.ok("✅")
+                        # When document queue is ready, push it
+                        with yaspin(text="Pushing documents", color="cyan") as spinner:
+                            try:
+                                self.awsinspectorelk.push_queue()
+                                
+                            except Exception as e:
+                                self.logger.error('AWS Inspectors document queue push failed: {}'.format(e))  
+                                return 
 
+                            spinner.ok("✅")
+
+                    else:
+                        self.logger.warn('Scan doesn\'t contain any finding')
 
                     # save the scan (assessmentRun) in the scanwhisperer db
                     record_meta = (

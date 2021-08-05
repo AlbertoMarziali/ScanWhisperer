@@ -35,7 +35,7 @@ class scanWhispererBitSight(scanWhispererBase):
         if verbose:
             self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('Starting {} whisperer'.format(self.CONFIG_SECTION))
+        self.logger.info('\nStarting BitSight whisperer')
 
         # if the config is available
         if config is not None:
@@ -92,7 +92,7 @@ class scanWhispererBitSight(scanWhispererBase):
                     self.logger.info('Processing company: {}'.format(company.get('name')))
 
                     # For each company, get findings and create documents
-                    with yaspin(text="Fetching findings and creating documents", color="cyan") as spinner:
+                    with yaspin(text="Fetching BitSight findings and creating documents", color="cyan") as spinner:
                         try:
                             self.bitsightapi.get_findings(company, self.bitsightelk.add_to_queue)
                         except Exception as e:

@@ -40,7 +40,7 @@ class scanWhispererNessus(scanWhispererBase):
         if verbose:
             self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('Starting Nessus whisperer')
+        self.logger.info('\nStarting Nessus whisperer')
 
         # if the config is available
         if config is not None:
@@ -161,8 +161,10 @@ class scanWhispererNessus(scanWhispererBase):
                         
                         spinner.ok("✅")
 
-                    # ONLY FOR NESSUS: Add Host info
+                    # Check if the scan contains some findings
                     if len(report_csv) > 0:
+
+                        # Get host info
                         with yaspin(text="Fetching host info", color="cyan") as spinner:
                             try:
                                 host_list = self.nessusapi.get_scan_hosts(scan_id=scan['scan_id'], history_id=scan['history_id'])
@@ -175,35 +177,39 @@ class scanWhispererNessus(scanWhispererBase):
                                 report_csv['Mac Address'] = report_csv.apply (lambda row: host_list.get(row['Host'], {}).get('mac-address', ''), axis=1) 
 
                                 self.logger.debug('Added host info for {} hosts'.format(len(host_list)))
+
                             except Exception as e:
                                 self.logger.error('Host info download failed: {}'.format(e))   
                                 return
 
                             spinner.ok("✅")
 
-                    # Iterate over report lines and creates documents
-                    with yaspin(text='Creating documents for {} Nessus findings.'.format(report_csv.shape[0]), color="cyan") as spinner:
-                        try:
-                            for index, finding in report_csv.iterrows():
-                                # Add document from finding
-                                self.nessuselk.add_to_queue(scan, finding)
+                        # Iterate over report lines and creates documents
+                        with yaspin(text='Creating documents for {} Nessus findings.'.format(report_csv.shape[0]), color="cyan") as spinner:
+                            try:
+                                for index, finding in report_csv.iterrows():
+                                    # Add document from finding
+                                    self.nessuselk.add_to_queue(scan, finding)
 
-                        except Exception as e:
-                            self.logger.error('Nessus document creation failed: {}'.format(e))   
-                            return
+                            except Exception as e:
+                                self.logger.error('Nessus document creation failed: {}'.format(e))   
+                                return
 
-                        spinner.ok("✅")
+                            spinner.ok("✅")
 
-                    # When document queue is ready, push it
-                    with yaspin(text="Pushing documents", color="cyan") as spinner:
-                        try:
-                            self.nessuselk.push_queue()
-                            
-                        except Exception as e:
-                            self.logger.error('Nessus document queue push failed: {}'.format(e))  
-                            return 
+                        # When document queue is ready, push it
+                        with yaspin(text="Pushing documents", color="cyan") as spinner:
+                            try:
+                                self.nessuselk.push_queue()
+                                
+                            except Exception as e:
+                                self.logger.error('Nessus document queue push failed: {}'.format(e))  
+                                return 
 
-                        spinner.ok("✅")
+                            spinner.ok("✅")
+
+                    else:
+                        self.logger.warn('Scan doesn\'t contain any finding')
 
                     # Save the scan in ScanWhisperer DB
                     record_meta = (

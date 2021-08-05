@@ -65,7 +65,7 @@ class scanWhispererBase(object):
             try:
                 self.conn = sqlite3.connect(self.database)
                 self.cur = self.conn.cursor()
-                self.logger.info('Connected to database at {loc}'.format(loc=self.database))
+                self.logger.debug('Connected to database at {loc}'.format(loc=self.database))
             except Exception as e:
                 self.logger.error(
                     'Could not connect to database at {loc}\nReason: {e} - Please ensure the path exist'.format(
@@ -110,7 +110,7 @@ class scanWhispererBase(object):
 
     def init(self):
         if self.purge:
-            self.logger.info('Requested purge of {} data.'.format(self.CONFIG_SECTION))
+            self.logger.debug('Requested purge of {} data.'.format(self.CONFIG_SECTION))
             self.delete_table()
         self.create_table()
 

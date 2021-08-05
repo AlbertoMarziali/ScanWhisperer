@@ -40,7 +40,7 @@ class scanWhispererTenableio(scanWhispererBase):
         if verbose:
             self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('Starting Tenable.io whisperer')
+        self.logger.info('\nStarting Tenable.io whisperer')
 
         # if the config is available
         if config is not None:
@@ -157,29 +157,35 @@ class scanWhispererTenableio(scanWhispererBase):
                         
                         spinner.ok("✅")
 
-                    # Iterate over report lines and creates documents
-                    with yaspin(text='Creating documents for {} Tenable.io findings.'.format(report_csv.shape[0]), color="cyan") as spinner:
-                        try:
-                            for index, finding in report_csv.iterrows():
-                                # Add document from finding
-                                self.tenableioelk.add_to_queue(scan, finding)
+                    # Check if the scan contains some findings
+                    if len(report_csv) > 0:
 
-                        except Exception as e:
-                            self.logger.error('Tenable.io document creation failed: {}'.format(e))   
-                            return
+                        # Iterate over report lines and creates documents
+                        with yaspin(text='Creating documents for {} Tenable.io findings.'.format(report_csv.shape[0]), color="cyan") as spinner:
+                            try:
+                                for index, finding in report_csv.iterrows():
+                                    # Add document from finding
+                                    self.tenableioelk.add_to_queue(scan, finding)
 
-                        spinner.ok("✅")
+                            except Exception as e:
+                                self.logger.error('Tenable.io document creation failed: {}'.format(e))   
+                                return
 
-                    # When document queue is ready, push it
-                    with yaspin(text="Pushing documents", color="cyan") as spinner:
-                        try:
-                            self.tenableioelk.push_queue()
-                            
-                        except Exception as e:
-                            self.logger.error('Tenable.io document queue push failed: {}'.format(e))  
-                            return 
+                            spinner.ok("✅")
 
-                        spinner.ok("✅")
+                        # When document queue is ready, push it
+                        with yaspin(text="Pushing documents", color="cyan") as spinner:
+                            try:
+                                self.tenableioelk.push_queue()
+                                
+                            except Exception as e:
+                                self.logger.error('Tenable.io document queue push failed: {}'.format(e))  
+                                return 
+
+                            spinner.ok("✅")
+
+                    else:
+                        self.logger.warn('Scan doesn\'t contain any finding')
 
                     # Save the scan in ScanWhisperer DB
                     record_meta = (

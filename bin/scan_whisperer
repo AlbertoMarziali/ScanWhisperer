@@ -57,6 +57,10 @@ def main():
         import coloredlogs
         coloredlogs.install(level='INFO')
 
+    # warn about db being purged
+    if args.purge:
+        logger.warn('Requested purge of SQLite DB')
+
     exit_code = 0
 
     # Intro
