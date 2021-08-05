@@ -24,8 +24,6 @@ class NiktoWrapperS3(object):
         if self.s3.Bucket(bucket_name).creation_date is None:
             raise Exception('ERROR: Bucket {} not found'.format(bucket_name))
 
-        self.get_new_files()
-
         
     def get_new_files(self):
         files = []

@@ -18,7 +18,6 @@ class NessusAPI(object):
         if not all((access_key, secret_key)):
             raise Exception('ERROR: Missing API keys.')
 
-        self.api_keys = False
         self.access_key = access_key
         self.secret_key = secret_key
         self.base = 'https://{hostname}:{port}'.format(hostname=hostname, port=port)
@@ -42,9 +41,6 @@ class NessusAPI(object):
 
         self.session.headers['X-ApiKeys'] = 'accessKey={}; secretKey={}'.format(self.access_key, self.secret_key)
 
-        self.scans = self.get_scans()
-        self.scan_ids = self.get_scan_ids()
-
 
     def request(self, url, data=None, headers=None, method='POST', download=False, json_output=False):
         timeout = 0
@@ -59,14 +55,7 @@ class NessusAPI(object):
             if response.status_code == 401:
                 if url == self.base + '/session':
                     break
-                try:
-                    timeout += 1
-                    if self.api_keys:
-                        continue
-                    self.login()
-                    self.logger.debug('Token refreshed')
-                except Exception as e:
-                    self.logger.error('Could not refresh token\nReason: {}'.format(str(e)))
+                timeout += 1
             else:
                 success = True
 
@@ -88,13 +77,6 @@ class NessusAPI(object):
     def get_scans(self):
         scans = self.request('/scans', method='GET', json_output=True)
         return scans
-
-
-    def get_scan_ids(self):
-        scans = self.scans
-        scan_ids = [scan_id['id'] for scan_id in scans['scans']] if scans['scans'] else []
-        self.logger.debug('Found {} scan_ids'.format(len(scan_ids)))
-        return scan_ids
 
 
     def get_scan_history(self, scan_id):

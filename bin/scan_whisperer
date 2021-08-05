@@ -1,15 +1,24 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-__author__ = 'Austin Taylor'
+__author__ = 'Alberto Marziali'
 
-
-from scanwhisp.scanwhisp import scanWhisperer
-from scanwhisp.base.config import swConfig
 import os
 import argparse
 import sys
 import logging
 from logging.handlers import RotatingFileHandler
+import schedule
+import time
+
+# Common
+from scanwhisp.base.config import swConfig
+
+# Modules
+from scanwhisp.modules.nessus.nessus import scanWhispererNessus
+from scanwhisp.modules.tenableio.tenableio import scanWhispererTenableio
+from scanwhisp.modules.awsinspector.awsinspector import scanWhispererAWSInspector
+from scanwhisp.modules.niktowrapper.niktowrapper import scanWhispererNiktoWrapper
+from scanwhisp.modules.bitsight.bitsight import scanWhispererBitSight
 
 
 def isFileValid(parser, arg):
@@ -35,13 +44,15 @@ def main():
                         help='Enable colourful logging output')
     parser.add_argument('-l', '--log', dest='logfile', required=False,
                         help='Path of log file')
+    parser.add_argument('-D', '--daemon', action='store_true',
+                        help='Launch as daemon')
     args = parser.parse_args()
 
     # First setup logging
     logging.basicConfig(
         stream=sys.stdout,
         #format only applies when not using -F flag for colouring
-        format='%(levelname)s:%(name)s:%(funcName)s %(message)s' if args.verbose else '%(message)s',
+        format='%(levelname)s:%(name)s:%(funcName)s %(message)s' if args.verbose else '%(name)s %(message)s',
         level=logging.INFO
     )
     logger = logging.getLogger()
@@ -61,8 +72,6 @@ def main():
     if args.purge:
         logger.warn('Requested purge of SQLite DB')
 
-    exit_code = 0
-
     # Intro
     logger.info('+-+-+-+-+-+-+-+-+-+-+-+-+-+')
     logger.info('|S|c|a|n|W|h|i|s|p|e|r|e|r|')
@@ -72,48 +81,83 @@ def main():
     logger.info('')
 
     try:
+        # Get sections from argument or from configuration file
         if args.config and not args.section:
-            # this remains a print since we are in the main binary
             logger.info('No section was specified, scanwhisperer will scrape enabled modules from the config file.')
             
             config = swConfig(config_in=args.config)
-            enabled_sections = config.get_sections_with_attribute('enabled')
-
-            for section in enabled_sections:
-                try:
-                    sw = scanWhisperer(config=args.config,
-                                       profile=section,
-                                       verbose=args.verbose,
-                                       purge=args.purge)
-                    exit_code += sw.whisper_vulnerabilities()
-                except Exception as e:
-                    logger.error("ScanWhisperer was unable to perform the processing on '{}': {}".format(section, e))
+            sections = config.get_sections_with_attribute('enabled')
         else:
-            logger.info('Running ScanWhisperer for section {}'.format(args.section))
-            sw = scanWhisperer(config=args.config,
-                               profile=args.section,
-                               verbose=args.verbose,
-                               purge=args.purge)
-            exit_code += sw.whisper_vulnerabilities()
+            logger.info('Section specified: {}'.format(args.section))
 
-        close_logging_handlers(logger)
-        sys.exit(exit_code)
+            sections = [args.section]
+
+        # Iterate over selected sections and launch or schedule launch for each one
+        for section in sections:
+            try:
+                if section == 'nessus':
+                    sw = scanWhispererNessus(   config=args.config,
+                                                profile=section,
+                                                verbose=args.verbose,
+                                                purge=args.purge,
+                                                daemon=args.daemon)
+                    if sw:
+                        schedule.every(1).minutes.do(sw.whisper_nessus)
+
+                elif section == 'tenableio':
+                    sw = scanWhispererTenableio(config=args.config,
+                                                profile=section,
+                                                verbose=args.verbose,
+                                                purge=args.purge,
+                                                daemon=args.daemon)
+                    if sw:
+                        schedule.every(1).minutes.do(sw.whisper_tenableio)
+
+                elif section == 'awsinspector':
+                    sw = scanWhispererAWSInspector( config=args.config,
+                                                    verbose=args.verbose,
+                                                    purge=args.purge,
+                                                    daemon=args.daemon)
+                    if sw:
+                        schedule.every(1).minutes.do(sw.whisper_awsinspector)
+
+                elif section == 'niktowrapper':
+                    sw = scanWhispererNiktoWrapper( config=args.config,
+                                                    verbose=args.verbose,
+                                                    daemon=args.daemon)
+                    if sw:
+                        schedule.every(1).minutes.do(sw.whisper_niktowrapper)
+
+                elif section == 'bitsight':
+                    sw = scanWhispererBitSight( config=args.config,
+                                                verbose=args.verbose,
+                                                daemon=args.daemon)
+                    if sw:
+                        schedule.every(60).minutes.do(sw.whisperer_bitsight)
+    
+            except Exception as e:
+                logger.error("ScanWhisperer was unable to perform the processing on '{}': {}".format(section, e))
+
+        # Run all scheduled actions 
+        schedule.run_all()
+
+        # If daemon, loop, if not, cancel jobs and quit
+        if args.daemon:
+            # Run when scheduled
+            while True:
+                schedule.run_pending()
+                time.sleep(1)
+        else: 
+            schedule.clear()
 
     except Exception as e:
-        if args.verbose:
-            # this will remain a print since we are in the main binary
-            logger.error('{}'.format(str(e)))
-            print('ERROR: {error}'.format(error=e))
-        # TODO: fix this to NOT be exit 2 unless in error
-        close_logging_handlers(logger)
-        sys.exit(2)
-
-    close_logging_handlers(logger)
-
-def close_logging_handlers(logger):
+        logger.error('ScanWhisperer fatal error: {}'.format(e))
+    
+    # Close logging handlers
     for handler in logger.handlers:
         handler.close()
         logger.removeFilter(handler)
+   
 
 if __name__ == '__main__':
     main()

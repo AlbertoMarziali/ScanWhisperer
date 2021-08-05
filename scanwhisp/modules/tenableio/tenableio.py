@@ -13,8 +13,6 @@ import io
 import time
 import logging
 
-from yaspin import yaspin
-
 
 class scanWhispererTenableio(scanWhispererBase):
     CONFIG_SECTION = None
@@ -25,7 +23,8 @@ class scanWhispererTenableio(scanWhispererBase):
             config=None,
             db_name='report_tracker.db',
             purge=False,
-            verbose=False
+            verbose=False,
+            daemon=False
     ):
         self.CONFIG_SECTION = profile
 
@@ -34,13 +33,14 @@ class scanWhispererTenableio(scanWhispererBase):
         self.develop = True
         self.purge = purge
         self.verbose = verbose
+        self.daemon = daemon
 
         # set up logger
         self.logger = logging.getLogger('scanWhispererTenableio')
         if verbose:
             self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('\nStarting Tenable.io whisperer')
+        self.logger.info('Starting Tenable.io module')
 
         # if the config is available
         if config is not None:
@@ -121,10 +121,10 @@ class scanWhispererTenableio(scanWhispererBase):
         scans_to_process = [scan for scan in scans_to_process if scan['status'] in ['completed', 'imported']]
 
         # Exclude already processed scans
-        if self.uuids:
-            scans_to_process = [scan for scan in scans_to_process if scan['uuid'] not in self.uuids]
+        uuids = self.retrieve_uuids()
+        if uuids:
+            scans_to_process = [scan for scan in scans_to_process if scan['uuid'] not in uuids]
 
-        self.logger.info('Identified {new} scans to be processed'.format(new=len(scans_to_process)))
 
         return scans_to_process
 
@@ -133,35 +133,35 @@ class scanWhispererTenableio(scanWhispererBase):
         if self.tenableioapi_connect and self.tenableioelk_connect:
             # get scan list from tenableio/tenableio, avoiding already fetched scans (if failed, throw an exception)
             try:
-                scan_list = self.get_scans_to_process(self.tenableioapi.scans['scans'])
+                scan_list = self.get_scans_to_process(self.tenableioapi.get_scans()['scans'])
 
                 # if no scans are available, just exit
                 if not scan_list:
-                    self.logger.warn('No new scans to process. Exiting...')
-                    return self.exit_code
+                    if not self.daemon:
+                        self.logger.warn('No new scans to process. Exiting...')
+                else:
+                    self.logger.info('Identified {new} scans to be processed'.format(new=len(scan_list)))
 
-                # for each scan to process, download csv report and export to Elastic Search
-                for scan in scan_list:
-                    
-                    # Start
-                    self.logger.info('Processing Tenable.io scan {}, (history {})'.format(scan['scan_id'], scan['history_id']))
+                    # for each scan to process, download csv report and export to Elastic Search
+                    for scan in scan_list:
+                        
+                        # Start
+                        self.logger.info('Processing Tenable.io scan {}, (history {})'.format(scan['scan_id'], scan['history_id']))
 
-                    # Download the scan report and import inside a DataFrame
-                    with yaspin(text="Downloading findings", color="cyan") as spinner:
+                        # Download the scan report and import inside a DataFrame
+                        self.logger.debug('Downloading findings...')
                         try:
                             report_req = self.tenableioapi.download_scan(scan_id=scan['scan_id'], history=scan['history_id'], export_format='csv')
                             report_csv = pd.read_csv(io.StringIO(report_req), na_filter=False)
                         except Exception as e:
                             self.logger.error('Tenable.io findings download failed: {}'.format(e))  
                             return
-                        
-                        spinner.ok("✅")
 
-                    # Check if the scan contains some findings
-                    if len(report_csv) > 0:
+                        # Check if the scan contains some findings
+                        if len(report_csv) > 0:
 
-                        # Iterate over report lines and creates documents
-                        with yaspin(text='Creating documents for {} Tenable.io findings.'.format(report_csv.shape[0]), color="cyan") as spinner:
+                            # Iterate over report lines and creates documents
+                            self.logger.debug('Creating documents from {} Tenable.io findings...'.format(report_csv.shape[0]))
                             try:
                                 for index, finding in report_csv.iterrows():
                                     # Add document from finding
@@ -171,10 +171,8 @@ class scanWhispererTenableio(scanWhispererBase):
                                 self.logger.error('Tenable.io document creation failed: {}'.format(e))   
                                 return
 
-                            spinner.ok("✅")
-
-                        # When document queue is ready, push it
-                        with yaspin(text="Pushing documents", color="cyan") as spinner:
+                            # When document queue is ready, push it
+                            self.logger.debug('Pushing documents...')
                             try:
                                 self.tenableioelk.push_queue()
                                 
@@ -182,35 +180,34 @@ class scanWhispererTenableio(scanWhispererBase):
                                 self.logger.error('Tenable.io document queue push failed: {}'.format(e))  
                                 return 
 
-                            spinner.ok("✅")
+                        else:
+                            self.logger.warn('Scan doesn\'t contain any finding')
 
-                    else:
-                        self.logger.warn('Scan doesn\'t contain any finding')
+                        # Save the scan in ScanWhisperer DB
+                        record_meta = (
+                                scan['scan_name'],
+                                scan['scan_id'],
+                                scan['norm_time'],
+                                'file_name',
+                                time.time(),
+                                report_csv.shape[0],
+                                self.CONFIG_SECTION,
+                                scan['uuid'],
+                                1,
+                                0,
+                            )
+                        self.record_insert(record_meta)
 
-                    # Save the scan in ScanWhisperer DB
-                    record_meta = (
-                            scan['scan_name'],
-                            scan['scan_id'],
-                            scan['norm_time'],
-                            'file_name',
-                            time.time(),
-                            report_csv.shape[0],
-                            self.CONFIG_SECTION,
-                            scan['uuid'],
-                            1,
-                            0,
-                        )
-                    self.record_insert(record_meta)
-
-                    self.logger.info('Scan processed successfully.')   
+                        self.logger.info('Scan processed successfully.')   
 
             except Exception as e:
                 self.logger.error('Could not process new Tenable.io scans: {}'.format(e))
                             
-            self.conn.close()
-            self.logger.info('Scan aggregation completed!')
         else:
             self.logger.error('Failed to connect to Tenable.io API')
-            self.exit_code += 1
-        return self.exit_code
+        
+        # Close DB connection only if not in daemon mode
+        if not self.daemon:
+            self.conn.close()
+            self.logger.info('Tenable.io module\'s job completed!')
 

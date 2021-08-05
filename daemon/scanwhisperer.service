@@ -1,0 +1,11 @@
+[Unit]
+Description=Scan Whisperer Service
+
+[Service]
+ExecStart=/home/scanaggregator/.local/bin/scan_whisperer -c /opt/scanaggregator/data/scanwhisperer/config/frameworks.ini -l /opt/scanaggregator/data/scanwhisperer/scanwhisperer.log -D
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+User=scanaggregator
+
+[Install]
+WantedBy=default.target

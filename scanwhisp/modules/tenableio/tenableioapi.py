@@ -42,15 +42,7 @@ class TenableioAPI(object):
             'X-Cookie': None
         }
 
-        if all((self.access_key, self.secret_key)):
-            self.logger.debug('Using Tenable.io API keys')
-            self.api_keys = True
-            self.session.headers['X-ApiKeys'] = 'accessKey={}; secretKey={}'.format(self.access_key, self.secret_key)
-        else:
-            self.login()
-
-        self.scans = self.get_scans()
-        self.scan_ids = self.get_scan_ids()
+        self.session.headers['X-ApiKeys'] = 'accessKey={}; secretKey={}'.format(self.access_key, self.secret_key)
 
 
     def request(self, url, data=None, headers=None, method='POST', download=False, json_output=False):
@@ -66,14 +58,7 @@ class TenableioAPI(object):
             if response.status_code == 401:
                 if url == self.base + '/session':
                     break
-                try:
-                    timeout += 1
-                    if self.api_keys:
-                        continue
-                    self.login()
-                    self.logger.debug('Token refreshed')
-                except Exception as e:
-                    self.logger.error('Could not refresh token\nReason: {}'.format(str(e)))
+                timeout += 1
             else:
                 success = True
 

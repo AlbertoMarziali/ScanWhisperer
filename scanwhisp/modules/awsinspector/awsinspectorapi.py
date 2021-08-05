@@ -36,10 +36,6 @@ class AWSInspectorAPI(object):
             region_name = region_name
         )
 
-        # prepare scan lists
-        self.scans = self.get_scans()
-        self.scan_ids = self.get_scan_arns()
-
         # setup organizations client
         self.organization = boto3.client('organizations',
             aws_access_key_id=organization_access_key,
@@ -69,12 +65,6 @@ class AWSInspectorAPI(object):
                 scans.extend(response['assessmentRuns'])
 
         return scans
-
-
-    def get_scan_arns(self):
-        scans = self.scans
-        scan_arns = [scan_arn['arn'] for scan_arn in scans] if scans else []
-        return scan_arns
 
 
     def get_scan_findings(self, scan_arn):

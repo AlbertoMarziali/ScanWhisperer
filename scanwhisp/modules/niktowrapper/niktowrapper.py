@@ -12,7 +12,6 @@ import logging
 import io
 import pandas as pd
 
-from yaspin import yaspin
 
 class scanWhispererNiktoWrapper(scanWhispererBase):
     CONFIG_SECTION = None
@@ -21,20 +20,22 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
             self,
             profile='niktowrapper',
             config=None,
-            verbose=None
+            verbose=False,
+            daemon=False
     ):
         self.CONFIG_SECTION = profile
 
         super(scanWhispererNiktoWrapper, self).__init__(config=config)
 
         self.verbose = verbose
+        self.daemon = daemon
 
         # set up logger
         self.logger = logging.getLogger('scanWhispererNiktoWrapper')
         if verbose:
             self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('\nStarting NiktoWrapper whisperer')
+        self.logger.info('Starting NiktoWrapper module')
 
         # if the config is available
         if config is not None:
@@ -94,7 +95,8 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
 
                 # if no scans are available, just exit
                 if not files_to_process or len(files_to_process) == 0:
-                    self.logger.warn('No new scans to process.')
+                    if not self.daemon:
+                        self.logger.warn('No new scans to process.')
                 else:
                     self.logger.info('Processing {} new reports'.format(len(files_to_process)))
                             
@@ -104,64 +106,53 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
                         self.logger.info('Processing report {}'.format(remote_file_name))
 
                         # Download the file from S3     
-                        with yaspin(text="Downloading report", color="cyan") as spinner:
-                            try:
-                                report_csv = pd.read_csv(io.StringIO(self.niktowrappers3.download_file(remote_file_name)), na_filter=False)
-                            except Exception as e:
-                                self.logger.error('NiktoWrapper findings download failed: {}'.format(e))  
-                                return
-
-                            spinner.ok("✅")
+                        self.logger.debug('Downloading report...')
+                        try:
+                            report_csv = pd.read_csv(io.StringIO(self.niktowrappers3.download_file(remote_file_name)), na_filter=False)
+                        except Exception as e:
+                            self.logger.error('NiktoWrapper findings download failed: {}'.format(e))  
+                            return
 
                         # Check if the report contains some findings
                         if len(report_csv) > 0:
                         
                             # Iterate over report lines and push it to Elastic Search
-                            with yaspin(text='Creating documents from {} NiktoWrapper findings.'.format(report_csv.shape[0]), color="cyan") as spinner:
-                                try:
-                                    # Iterate over report rows
-                                    for index, finding in report_csv.iterrows():
-                                        self.niktowrapperelk.add_to_queue(finding)
-                                except Exception as e:
-                                    self.logger.error('NiktoWrapper document creation failed: {}'.format(e))   
-                                    return
-
-                                spinner.ok("✅")
+                            self.logger.debug('Creating documents from {} NiktoWrapper findings...'.format(report_csv.shape[0]))
+                            try:
+                                # Iterate over report rows
+                                for index, finding in report_csv.iterrows():
+                                    self.niktowrapperelk.add_to_queue(finding)
+                            except Exception as e:
+                                self.logger.error('NiktoWrapper document creation failed: {}'.format(e))   
+                                return
                             
                             # When document queue is ready, push it
-                            with yaspin(text="Pushing documents", color="cyan") as spinner:
-                                try:
-                                    self.niktowrapperelk.push_queue()  
-                                except Exception as e:
-                                    self.logger.error('NiktoWrapper document queue push failed: {}'.format(e))   
-                                    return
-
-                                spinner.ok("✅")
+                            self.logger.debug('Pushing documents...')
+                            try:
+                                self.niktowrapperelk.push_queue()  
+                            except Exception as e:
+                                self.logger.error('NiktoWrapper document queue push failed: {}'.format(e))   
+                                return
 
                             # Delete the file from S3
-                            with yaspin(text="Deleting report from S3", color="cyan") as spinner:
-                                try:
-                                    self.niktowrappers3.delete_file(remote_file_name)
-                                    self.logger.debug('File removed from S3: {}'.format(remote_file_name))
-                                except Exception as e:
-                                    self.logger.error('NiktoWrapper report deletion failed: {}'.format(e))  
-                                    return
-
-                            spinner.ok("✅")
+                            self.logger.debug('Deleting report from S3...')
+                            try:
+                                self.niktowrappers3.delete_file(remote_file_name)
+                                self.logger.debug('File removed from S3: {}'.format(remote_file_name))
+                            except Exception as e:
+                                self.logger.error('NiktoWrapper report deletion failed: {}'.format(e))  
+                                return
 
                         else:
                             self.logger.warn('Report doesn\'t contain any finding')
-
-                # done
-                self.logger.info('All jobs done.')
 
             except Exception as e:
                 self.logger.error('Download from S3 failed: {}'.format(e))
 
         else:
             self.logger.error('Connection to S3 unavailable.')
-            self.exit_code += 1
 
-        self.logger.info('Done. ({})'.format(self.exit_code))
-        return self.exit_code
+        # Close DB connection only if not in daemon mode
+        if not self.daemon:
+            self.logger.info('NiktoWrapper module\'s job completed!')
 

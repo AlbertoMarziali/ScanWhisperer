@@ -90,7 +90,6 @@ class scanWhispererBase(object):
         ]
 
         self.init()
-        self.uuids = self.retrieve_uuids()
         self.processed = 0
         self.skipped = 0
         self.scan_list = []
