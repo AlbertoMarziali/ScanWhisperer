@@ -135,7 +135,7 @@ class scanWhispererTenableio(scanWhispererBase):
         if self.ready:
             # get scan list from tenableio/tenableio, avoiding already fetched scans (if failed, throw an exception)
             try:
-                scan_list = self.get_scans_to_process(self.tenableioapi.get_scans()['scans'])
+                scan_list = self.get_scans_to_process(self.tenableioapi.get_scans().get('scans', []))
 
                 # if no scans are available, just exit
                 if not scan_list:
