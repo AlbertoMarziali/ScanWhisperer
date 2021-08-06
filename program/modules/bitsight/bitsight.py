@@ -4,13 +4,11 @@ from __future__ import absolute_import
 
 __author__ = 'Alberto Marziali'
 
-from ...base.base import scanWhispererBase
-from ...modules.bitsight.bitsightapi import BitSightAPI
-from ...modules.bitsight.bitsightelk import BitSightELK
+from base.base import scanWhispererBase
+from modules.bitsight.bitsightapi import BitSightAPI
+from modules.bitsight.bitsightelk import BitSightELK
 
 import logging
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class scanWhispererBitSight(scanWhispererBase):

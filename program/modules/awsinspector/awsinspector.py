@@ -4,9 +4,9 @@ from __future__ import absolute_import
 
 __author__ = 'Alberto Marziali'
 
-from ...base.base import scanWhispererBase
-from ...modules.awsinspector.awsinspectorapi import AWSInspectorAPI
-from ...modules.awsinspector.awsinspectorelk import AWSInspectorELK
+from base.base import scanWhispererBase
+from modules.awsinspector.awsinspectorapi import AWSInspectorAPI
+from modules.awsinspector.awsinspectorelk import AWSInspectorELK
 
 import time
 import logging

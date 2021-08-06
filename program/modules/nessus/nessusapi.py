@@ -1,7 +1,9 @@
 from __future__ import absolute_import
+
+__author__ = 'Alberto Marziali'
+
 import json
 import logging
-import sys
 import time
 from datetime import datetime
 
@@ -9,21 +11,18 @@ import pytz
 import requests
 
 
-class TenableioAPI(object):
+class NessusAPI(object):
 
-    def __init__(self, hostname=None, port=None, username=None, password=None, verbose=False, access_key=None, secret_key=None):
-        self.logger = logging.getLogger('TenableioAPI')
+    def __init__(self, hostname=None, port=None, verbose=False, access_key=None, secret_key=None):
+        self.logger = logging.getLogger('NessusAPI')
         if verbose:
             self.logger.setLevel(logging.DEBUG)
-        if not all((username, password)) and not all((access_key, secret_key)):
-            raise Exception('ERROR: Missing username, password or API keys.')
+        if not all((access_key, secret_key)):
+            raise Exception('ERROR: Missing API keys.')
 
-        self.user = username
-        self.password = password
-        self.api_keys = False
         self.access_key = access_key
         self.secret_key = secret_key
-        self.base = 'https://cloud.tenable.com'.format(hostname=hostname)
+        self.base = 'https://{hostname}:{port}'.format(hostname=hostname, port=port)
         self.verbose = verbose
 
         self.session = requests.Session()
@@ -33,7 +32,7 @@ class TenableioAPI(object):
             'Origin': self.base,
             'Accept-Encoding': 'gzip, deflate, br',
             'Accept-Language': 'en-US,en;q=0.8',
-            'User-Agent': 'ScanWhisperer for Tenableio',
+            'User-Agent': 'ScanWhisperer for Nessus',
             'Content-Type': 'application/json',
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             'Referer': self.base,
@@ -81,18 +80,12 @@ class TenableioAPI(object):
 
 
     def check(self):
-        self.request('/server/status', method='GET', json_output=True)
+        self.request('/session', method='GET', json_output=True)
 
 
     def get_scans(self):
         scans = self.request('/scans', method='GET', json_output=True)
         return scans
-
-    def get_scan_ids(self):
-        scans = self.scans
-        scan_ids = [scan_id['id'] for scan_id in scans['scans']] if scans['scans'] else []
-        self.logger.debug('Found {} scan_ids'.format(len(scan_ids)))
-        return scan_ids
 
 
     def get_scan_history(self, scan_id):
@@ -134,6 +127,7 @@ class TenableioAPI(object):
         req = self.request(query, data=json.dumps(data), method='POST', json_output=True)
         try:
             file_id = req['file']
+            token_id = req['token'] if 'token' in req else req['temp_token']
         except Exception as e:
             self.logger.error('{}'.format(str(e)))
         self.logger.debug('Download for file id {}'.format(str(file_id)))
@@ -149,9 +143,9 @@ class TenableioAPI(object):
         self.logger.debug("Done: {}".format(counter))
 
         content = self.request('/scans/{scan_id}/export/{file_id}/download'.format(scan_id=scan_id, file_id=file_id), method='GET', download=True)
-       
+               
         return content
-
+        
 
     def get_utc_from_local(self, date_time, local_tz=None, epoch=True):
         date_time = datetime.fromtimestamp(date_time)

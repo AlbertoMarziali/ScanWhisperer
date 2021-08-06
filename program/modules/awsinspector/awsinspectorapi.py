@@ -1,9 +1,8 @@
 from __future__ import absolute_import
-import json
+
+__author__ = 'Alberto Marziali'
+
 import logging
-import sys
-import time
-from datetime import datetime
 
 import boto3 #AWS Python SDK
 

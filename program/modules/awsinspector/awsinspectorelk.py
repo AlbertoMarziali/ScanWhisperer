@@ -1,8 +1,10 @@
 from __future__ import absolute_import
+
+__author__ = 'Alberto Marziali'
+
 import logging
 from datetime import datetime
 
-from geoip import geolite2
 import hashlib
 from elasticsearch import Elasticsearch
 

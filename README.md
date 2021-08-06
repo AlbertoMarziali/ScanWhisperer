@@ -12,6 +12,7 @@ The main differences between the original version and this version are:
 - Supports BitSight API
 - Has been stripped down (OpenVAS, Qualys, Jira and MockAPI removed)
 - Sends reports to Elastic Search via API, completely bypassing Logstash
+- Can be installed as systemd service (daemon mode)
 
 Currently Supports
 -----------------
@@ -109,7 +110,7 @@ Instead of setting up a crontab job to run Scan Whisperer periodically, you can 
 To do that, you have to follow the following steps:
 1) Create a dedicated user (scanwhisperer)
 2) Make sure Scan Whisperer is up and running for that user (follow instructions above)
-3) Copy the <a href="https://github.com/AlbertoMarziali/ScanWhisperer/blob/main/daemon/scanwhisperer.service">scanwhisperer.service file</a> into ```/etc/systemd/system```. Adjust it to your configuration (directory structure etc.)
+3) Copy the <a href="https://github.com/AlbertoMarziali/ScanWhisperer/blob/main/daemon/scanwhisperer.service">scanwhisperer.service file</a> into ```/etc/systemd/system```. Adapt it to your configuration (directory structure, script path etc.)
 4) Enable the service at boot: ``` systemctl enable scanwhisperer ```
 5) Start the service ``` systemctl start scanwhisperer ```
 

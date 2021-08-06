@@ -11,14 +11,14 @@ import schedule
 import time
 
 # Common
-from scanwhisp.base.config import swConfig
+from base.config import swConfig
 
 # Modules
-from scanwhisp.modules.nessus.nessus import scanWhispererNessus
-from scanwhisp.modules.tenableio.tenableio import scanWhispererTenableio
-from scanwhisp.modules.awsinspector.awsinspector import scanWhispererAWSInspector
-from scanwhisp.modules.niktowrapper.niktowrapper import scanWhispererNiktoWrapper
-from scanwhisp.modules.bitsight.bitsight import scanWhispererBitSight
+from modules.nessus.nessus import scanWhispererNessus
+from modules.tenableio.tenableio import scanWhispererTenableio
+from modules.awsinspector.awsinspector import scanWhispererAWSInspector
+from modules.niktowrapper.niktowrapper import scanWhispererNiktoWrapper
+from modules.bitsight.bitsight import scanWhispererBitSight
 
 
 def isFileValid(parser, arg):

@@ -4,9 +4,9 @@ from __future__ import absolute_import
 
 __author__ = 'Alberto Marziali'
 
-from ...base.base import scanWhispererBase
-from ...modules.niktowrapper.niktowrappers3 import NiktoWrapperS3
-from ...modules.niktowrapper.niktowrapperelk import NiktoWrapperELK
+from base.base import scanWhispererBase
+from modules.niktowrapper.niktowrappers3 import NiktoWrapperS3
+from modules.niktowrapper.niktowrapperelk import NiktoWrapperELK
 
 import logging
 import io
@@ -155,5 +155,5 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
 
         # Close DB connection only if not in daemon mode
         if not self.daemon:
-            self.logger.info('NiktoWrapper module\'s job completed!')
+            self.logger.info('Module\'s job completed!')
 

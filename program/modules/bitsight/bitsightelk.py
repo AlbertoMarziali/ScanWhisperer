@@ -1,4 +1,7 @@
 from __future__ import absolute_import
+
+__author__ = 'Alberto Marziali'
+
 import logging
 
 import json
@@ -50,7 +53,7 @@ class BitSightELK(object):
         }
         self.elastic_client.indices.create(index='scanwhisperer-bitsight',body=mapping, ignore=400)
 
-        self.logger.info('Index "scanwhisperer-bitsight" on Elastic Search ready.')
+        self.logger.debug('Index "scanwhisperer-bitsight" on Elastic Search ready.')
 
 
     # This function adds field to document

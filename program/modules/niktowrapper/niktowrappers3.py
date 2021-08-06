@@ -1,4 +1,7 @@
 from __future__ import absolute_import
+
+__author__ = 'Alberto Marziali'
+
 import logging
 
 import boto3 #AWS Python SDK

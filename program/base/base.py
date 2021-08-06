@@ -5,7 +5,7 @@ from functools import reduce
 
 __author__ = 'Austin Taylor'
 
-from ..base.config import swConfig
+from base.config import swConfig
 import sys
 import os
 import sqlite3

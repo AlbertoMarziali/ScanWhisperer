@@ -4,9 +4,9 @@ from __future__ import absolute_import
 
 __author__ = 'Alberto Marziali'
 
-from ...base.base import scanWhispererBase
-from ...modules.tenableio.tenableioapi import TenableioAPI
-from ...modules.tenableio.tenableioelk import TenableioELK
+from base.base import scanWhispererBase
+from modules.tenableio.tenableioapi import TenableioAPI
+from modules.tenableio.tenableioelk import TenableioELK
 
 import pandas as pd
 import io
@@ -208,5 +208,5 @@ class scanWhispererTenableio(scanWhispererBase):
         # Close DB connection only if not in daemon mode
         if not self.daemon:
             self.conn.close()
-            self.logger.info('Tenable.io module\'s job completed!')
+            self.logger.info('Module\'s job completed!')
 
