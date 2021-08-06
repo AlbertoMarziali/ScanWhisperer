@@ -64,8 +64,6 @@ deactivate (for quitting the virtualenv once you are done)
 
 ```python
 pip install -r /path/to/ScanWhisperer/requirements.txt
-cd /path/to/ScanWhisperer
-python setup.py install
 ```
 
 **(Optional) If using a proxy, add proxy URL as environment variable to PATH**
@@ -109,9 +107,9 @@ Scan Whisperer can also be executed in daemon mode.
 Instead of setting up a crontab job to run Scan Whisperer periodically, you can setup the systemctl daemon to have it always running. 
 
 To do that, you have to follow the following steps:
-1) Make sure Scan Whisperer is setup correctly (see instructions above)
-2) Create a dedicated user (scanaggregator)
-3) Copy the <a href="https://github.com/AlbertoMarziali/ScanWhisperer/blob/main/daemon/scanwhisperer.service">scanwhisperer.service file</a> into ```/etc/systemd/system```
+1) Create a dedicated user (scanwhisperer)
+2) Make sure Scan Whisperer is up and running for that user (follow instructions above)
+3) Copy the <a href="https://github.com/AlbertoMarziali/ScanWhisperer/blob/main/daemon/scanwhisperer.service">scanwhisperer.service file</a> into ```/etc/systemd/system```. Adjust it to your configuration (directory structure etc.)
 4) Enable the service at boot: ``` systemctl enable scanwhisperer ```
 5) Start the service ``` systemctl start scanwhisperer ```
 
