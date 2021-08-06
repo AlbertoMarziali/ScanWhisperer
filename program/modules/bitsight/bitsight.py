@@ -91,6 +91,9 @@ class scanWhispererBitSight(scanWhispererBase):
 
                     self.logger.info('Processing company: {}'.format(company.get('name')))
 
+                    # Clear the document queue (avoid memory leak)
+                    self.bitsightelk.clear_queue()
+
                     # For each company, get findings and create documents
                     self.logger.debug('Fetching findings and creating documents...')
                     try:

@@ -139,6 +139,8 @@ class scanWhispererAWSInspector(scanWhispererBase):
 
                         # Check if the scan contains some findings
                         if len(findings) > 0:
+                            # Clear the document queue (avoid memory leak)
+                            self.awsinspectorelk.clear_queue()
 
                             # Cycle through every finding and create documents
                             self.logger.debug('Creating documents from {} findings'.format(len(findings)))

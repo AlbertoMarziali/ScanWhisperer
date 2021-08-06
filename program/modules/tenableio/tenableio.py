@@ -162,6 +162,9 @@ class scanWhispererTenableio(scanWhispererBase):
                         # Check if the scan contains some findings
                         if len(report_csv) > 0:
 
+                            # Clear the document queue (avoid memory leak)
+                            self.tenableioelk.clear_queue()
+
                             # Iterate over report lines and creates documents
                             self.logger.debug('Creating documents from {} findings...'.format(report_csv.shape[0]))
                             try:

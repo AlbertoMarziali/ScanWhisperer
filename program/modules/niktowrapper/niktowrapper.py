@@ -117,6 +117,9 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
 
                         # Check if the report contains some findings
                         if len(report_csv) > 0:
+
+                            # Clear the document queue (avoid memory leak)
+                            self.niktowrapperelk.clear_queue()
                         
                             # Iterate over report lines and push it to Elastic Search
                             self.logger.debug('Creating documents from {} NiktoWrapper findings...'.format(report_csv.shape[0]))

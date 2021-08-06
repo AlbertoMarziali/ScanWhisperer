@@ -207,4 +207,9 @@ class BitSightELK(object):
         self.logger.debug('Pushed {} bitsight documents to Elastic Search'.format(len(self.document_queue)))
 
         # Clear queue after push
+        self.clear_queue()
+
+
+    # Clear the document queue 
+    def clear_queue(self):
         self.document_queue = {}

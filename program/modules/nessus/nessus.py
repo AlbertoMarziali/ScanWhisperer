@@ -165,6 +165,9 @@ class scanWhispererNessus(scanWhispererBase):
                         # Check if the scan contains some findings
                         if len(report_csv) > 0:
 
+                            # Clear the document queue (avoid memory leak)
+                            self.nessuselk.clear_queue()
+
                             # Get host info
                             self.logger.debug('Fetching host info...')
                             try:
