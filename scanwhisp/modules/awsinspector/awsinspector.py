@@ -31,13 +31,14 @@ class scanWhispererAWSInspector(scanWhispererBase):
         self.purge = purge
         self.verbose = verbose
         self.daemon = daemon
+        self.ready = False
 
         # setup logger
         self.logger = logging.getLogger('scanWhispererAWSInspector')
         if verbose:
             self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('Starting AWS Inspector module')
+        self.logger.info('Starting Module')
 
         # if the config is available
         if config is not None:
@@ -66,7 +67,6 @@ class scanWhispererAWSInspector(scanWhispererBase):
                                   organization_secret_key=self.organization_secret_key,
                                   )
 
-                    self.awsinspectorapi_connect = True
                     self.logger.info('Connected to AWS Inspector')
 
                     try:
@@ -78,8 +78,10 @@ class scanWhispererAWSInspector(scanWhispererBase):
                                                                 verbose=verbose,
                                                                 awsinspectorapi=self.awsinspectorapi)
 
-                        self.awsinspectorelk_connect = True
                         self.logger.info('Connected to Elastic Search ({})'.format(self.elk_host))
+
+                        self.ready = True
+                        self.logger.info('Module Ready')
 
                     except Exception as e:
                         self.logger.error('Could not connect to Elastic Search ({}): {}'.format(self.elk_host, e))
@@ -108,7 +110,8 @@ class scanWhispererAWSInspector(scanWhispererBase):
 
 
     def whisper_awsinspector(self):
-        if self.awsinspectorapi_connect and self.awsinspectorelk_connect:
+        # If module is ready
+        if self.ready:
             # get scan list from inspector, avoiding already fetched scans (if failed, throw an exception)
             try:
                 scans = self.get_scans_to_process(self.awsinspectorapi.get_scans())
@@ -124,14 +127,14 @@ class scanWhispererAWSInspector(scanWhispererBase):
                     for scan in scans:
 
                         # Start
-                        self.logger.info('Processing AWS Inspector scan {}'.format(scan['arn']))
+                        self.logger.info('Processing scan {}'.format(scan['arn']))
 
                         # Download findings inside the scan
                         self.logger.debug('Downloading findings...')
                         try:
                             findings = self.awsinspectorapi.get_scan_findings(scan['arn'])
                         except Exception as e:
-                            self.logger.error('AWS Inspector findings download failed: {}'.format(e))   
+                            self.logger.error('Findings download failed: {}'.format(e))   
                             return
 
                         # Check if the scan contains some findings
@@ -143,7 +146,7 @@ class scanWhispererAWSInspector(scanWhispererBase):
                                 for finding in findings:
                                     self.awsinspectorelk.add_to_queue(scan, finding)
                             except Exception as e:
-                                self.logger.error('AWS Inspector document creation failed: {}'.format(e))   
+                                self.logger.error('Document creation failed: {}'.format(e))   
                                 return
 
                             # When document queue is ready, push it
@@ -152,7 +155,7 @@ class scanWhispererAWSInspector(scanWhispererBase):
                                 self.awsinspectorelk.push_queue()
                                 
                             except Exception as e:
-                                self.logger.error('AWS Inspectors document queue push failed: {}'.format(e))  
+                                self.logger.error('Document queue push failed: {}'.format(e))  
                                 return 
 
                         else:
@@ -173,16 +176,13 @@ class scanWhispererAWSInspector(scanWhispererBase):
                                     )
                         self.record_insert(record_meta)
 
-                        self.logger.info('Scan processed successfully.')   
+                        self.logger.info('Scan processed successfully')   
                     
             except Exception as e:
-                self.logger.error('Could not process new AWS Inspector scans: {}'.format(e))
-
-        else:
-            self.logger.error('Failed to connect to AWS Inspector API')
+                self.logger.error('Could not process new scans: {}'.format(e))
             
         # Close DB connection only if not in daemon mode
         if not self.daemon:
             self.conn.close()
-            self.logger.info('AWS Inspector module\'s job completed!')
+            self.logger.info('Module\'s job completed!')
 

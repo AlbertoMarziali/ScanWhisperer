@@ -43,6 +43,9 @@ class AWSInspectorAPI(object):
             region_name = region_name
         )
 
+        # check inspector connectivity by running a dry get scan
+        self.get_scans()
+
         # prepare account list
         self.aws_accounts = self.get_accounts() 
 

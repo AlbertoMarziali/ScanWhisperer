@@ -41,6 +41,9 @@ class NessusAPI(object):
 
         self.session.headers['X-ApiKeys'] = 'accessKey={}; secretKey={}'.format(self.access_key, self.secret_key)
 
+        # Check connection
+        self.check()
+
 
     def request(self, url, data=None, headers=None, method='POST', download=False, json_output=False):
         timeout = 0
@@ -72,6 +75,10 @@ class NessusAPI(object):
             self.logger.debug('Processed {} chunks'.format(count))
             return response_data
         return response
+
+
+    def check(self):
+        self.request('/session', method='GET', json_output=True)
 
 
     def get_scans(self):
@@ -128,8 +135,6 @@ class NessusAPI(object):
             report_status = self.request('/scans/{scan_id}/export/{file_id}/status'.format(scan_id=scan_id, file_id=file_id), method='GET',
                                          json_output=True)
             running = report_status['status'] != 'ready'
-            sys.stdout.write(".")
-            sys.stdout.flush()
             # FIXME: why? can this be removed in favour of a counter?
             if counter % 60 == 0:
                 self.logger.debug("Completed: {}".format(counter))

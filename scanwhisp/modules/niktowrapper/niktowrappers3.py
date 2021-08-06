@@ -21,8 +21,13 @@ class NiktoWrapperS3(object):
                             aws_secret_access_key=secret_key,
                             region_name = region_name)
 
-        if self.s3.Bucket(bucket_name).creation_date is None:
-            raise Exception('ERROR: Bucket {} not found'.format(bucket_name))
+        # Check
+        self.check()
+
+        
+    def check(self):
+        if self.s3.Bucket(self.bucket_name).creation_date is None:
+            raise Exception('ERROR: Bucket {} not found'.format(self.bucket_name))
 
         
     def get_new_files(self):

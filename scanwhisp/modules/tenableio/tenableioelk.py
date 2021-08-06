@@ -24,6 +24,9 @@ class TenableioELK(object):
         logging.getLogger('elasticsearch').setLevel(logging.CRITICAL)
         self.elastic_client = Elasticsearch('https://{}:{}@{}'.format(self.username, self.password, self.host), ca_certs=False, verify_certs=False)
         
+        # Check connection
+        self.elastic_client.info()
+        
         # Document queue
         self.document_queue = {}
 

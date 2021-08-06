@@ -29,13 +29,14 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
 
         self.verbose = verbose
         self.daemon = daemon
+        self.ready = False
 
         # set up logger
         self.logger = logging.getLogger('scanWhispererNiktoWrapper')
         if verbose:
             self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('Starting NiktoWrapper module')
+        self.logger.info('Starting Module')
 
         # if the config is available
         if config is not None:
@@ -62,7 +63,6 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
                                                             bucket_name=self.bucket_name,
                                                             verbose=verbose)
 
-                    self.niktowrappers3_connect = True
                     self.logger.info('Connected to S3')
 
                     try:
@@ -73,8 +73,10 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
                                                                 password=self.elk_password,
                                                                 verbose=verbose)
 
-                        self.niktowrapperelk_connect = True
                         self.logger.info('Connected to Elastic Search ({})'.format(self.elk_host))
+
+                        self.ready = True                            
+                        self.logger.info('Module Ready')
 
                     except Exception as e:
                         self.logger.error('Could not connect to Elastic Search ({}): {}'.format(self.elk_host, e))
@@ -87,8 +89,8 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
                 
 
     def whisper_niktowrapper(self):
-        # If S3 connection has been successful
-        if self.niktowrapperelk_connect and self.niktowrappers3_connect:
+        # If module is ready
+        if self.ready:
             # get new file list
             try:
                 files_to_process = self.niktowrappers3.get_new_files()
@@ -143,14 +145,13 @@ class scanWhispererNiktoWrapper(scanWhispererBase):
                                 self.logger.error('NiktoWrapper report deletion failed: {}'.format(e))  
                                 return
 
+                            self.logger.info('Report processed successfully')  
+
                         else:
                             self.logger.warn('Report doesn\'t contain any finding')
 
             except Exception as e:
                 self.logger.error('Download from S3 failed: {}'.format(e))
-
-        else:
-            self.logger.error('Connection to S3 unavailable.')
 
         # Close DB connection only if not in daemon mode
         if not self.daemon:

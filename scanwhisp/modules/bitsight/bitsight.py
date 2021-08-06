@@ -29,13 +29,14 @@ class scanWhispererBitSight(scanWhispererBase):
 
         self.verbose = verbose
         self.daemon = daemon
+        self.ready = False
 
         # set up logger
         self.logger = logging.getLogger('scanWhispererBitSight')
         if verbose:
             self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('Starting BitSight module')
+        self.logger.info('Starting Module')
 
         # if the config is available
         if config is not None:
@@ -55,7 +56,6 @@ class scanWhispererBitSight(scanWhispererBase):
                     self.bitsightapi = BitSightAPI( api_key=self.api_key,
                                                     verbose=verbose)
 
-                    self.bitsightapi_connect = True
                     self.logger.info('Connected to BitSight')
 
                     try:
@@ -67,9 +67,11 @@ class scanWhispererBitSight(scanWhispererBase):
                                          password=self.elk_password,
                                          verbose=verbose
                                         )
-
-                        self.bitsightelk_connect = True
+                        
                         self.logger.info('Connected to Elastic Search ({})'.format(self.elk_host))
+
+                        self.ready = True
+                        self.logger.info('Module Ready')
 
                     except Exception as e:
                         self.logger.error('Could not connect to Elastic Search ({}): {}'.format(self.elk_host, e))
@@ -78,12 +80,12 @@ class scanWhispererBitSight(scanWhispererBase):
                     self.logger.error('Could not connect to BitSight: {}'.format(str(e)))
 
             except Exception as e:
-                self.logger.error('Could not properly load your config!\nReason: {e}'.format(e=e))
+                self.logger.error('Could not properly load your config: {e}'.format(e=e))
                 
 
     def whisperer_bitsight(self):
-        # If BitSIght connection has been successful
-        if self.bitsightapi_connect and self.bitsightelk_connect:
+        # If module is ready
+        if self.ready:
             # Update all reports
             try:
                 # Get companies via API
@@ -92,11 +94,11 @@ class scanWhispererBitSight(scanWhispererBase):
                     self.logger.info('Processing company: {}'.format(company.get('name')))
 
                     # For each company, get findings and create documents
-                    self.logger.debug('Fetching BitSight findings and creating documents...')
+                    self.logger.debug('Fetching findings and creating documents...')
                     try:
                         self.bitsightapi.get_findings(company, self.bitsightelk.add_to_queue)
                     except Exception as e:
-                        self.logger.error('{} document creation failed: {}'.format(self.CONFIG_SECTION, e))
+                        self.logger.error('Document creation failed: {}'.format(e))
                         return
 
                     # Push documents to Elastic Search
@@ -104,19 +106,16 @@ class scanWhispererBitSight(scanWhispererBase):
                     try:
                         self.bitsightelk.push_queue()
                     except Exception as e:
-                        self.logger.error('{} document queue push failed: {}'.format(self.CONFIG_SECTION, e))   
+                        self.logger.error('Document queue push failed: {}'.format(e))   
                         return
 
                     # Company done
-                    self.logger.info('Done')
+                    self.logger.info('Report processed successfully')
 
             except Exception as e:
-                self.logger.error('Failed to process BitSight reports: {}'.format(e)) 
-
-        else:
-            self.logger.error('Connection to BitSight unavailable.')
+                self.logger.error('Failed to process reports: {}'.format(e)) 
 
         # Close DB connection only if not in daemon mode
         if not self.daemon:
-            self.logger.info('BitSight module\'s job completed!') 
+            self.logger.info('Module\'s job completed!') 
 

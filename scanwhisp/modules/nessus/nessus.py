@@ -30,17 +30,17 @@ class scanWhispererNessus(scanWhispererBase):
 
         super(scanWhispererNessus, self).__init__(config=config,purge=purge)
 
-        self.develop = True
         self.purge = purge
         self.verbose = verbose
         self.daemon = daemon
+        self.ready = False
 
         # set up logger
         self.logger = logging.getLogger('scanWhispererNessus')
         if verbose:
             self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('Starting Nessus module')
+        self.logger.info('Starting Module')
 
         # if the config is available
         if config is not None:
@@ -70,7 +70,6 @@ class scanWhispererNessus(scanWhispererBase):
                                    secret_key=self.secret_key,
                                    verbose=verbose
                                   )
-                    self.nessusapi_connect = True
                     self.logger.info('Connected to Nessus on {host}:{port}'.format(host=self.nessus_hostname,port=str(self.nessus_port)))
 
                     try:
@@ -82,8 +81,10 @@ class scanWhispererNessus(scanWhispererBase):
                                         password=self.elk_password,
                                         verbose=verbose
                                     )
-                        self.nessuselk_connect = True
                         self.logger.info('Connected to Elastic Search ({})'.format(self.elk_host))
+
+                        self.ready = True
+                        self.logger.info('Module ready')
 
                     except Exception as e:
                         self.logger.error('Could not connect to Elastic Search ({}): {}'.format(self.elk_host, e))
@@ -133,7 +134,8 @@ class scanWhispererNessus(scanWhispererBase):
 
 
     def whisper_nessus(self):
-        if self.nessusapi_connect and self.nessuselk_connect:
+        # If module is ready
+        if self.ready:
             # get scan list from nessus/tenableio, avoiding already fetched scans (if failed, throw an exception)
             try:
                 scan_list = self.get_scans_to_process(self.nessusapi.get_scans()['scans'])
@@ -149,7 +151,7 @@ class scanWhispererNessus(scanWhispererBase):
                     for scan in scan_list:
                         
                         # Start
-                        self.logger.info('Processing Nessus scan {}, (history {})'.format(scan['scan_id'], scan['history_id']))
+                        self.logger.info('Processing scan {}, (history {})'.format(scan['scan_id'], scan['history_id']))
 
                         # Download the scan report and import inside a DataFrame
                         self.logger.debug('Downloading findings...')
@@ -157,7 +159,7 @@ class scanWhispererNessus(scanWhispererBase):
                             report_req = self.nessusapi.download_scan(scan_id=scan['scan_id'], history=scan['history_id'], export_format='csv')
                             report_csv = pd.read_csv(io.StringIO(report_req), na_filter=False)
                         except Exception as e:
-                            self.logger.error('Nessus findings download failed: {}'.format(e))  
+                            self.logger.error('Findings download failed: {}'.format(e))  
                             return
 
                         # Check if the scan contains some findings
@@ -182,14 +184,14 @@ class scanWhispererNessus(scanWhispererBase):
                                 return
 
                             # Iterate over report lines and creates documents
-                            self.logger.debug('Creating documents for {} Nessus findings.'.format(report_csv.shape[0]))
+                            self.logger.debug('Creating documents from {} findings...'.format(report_csv.shape[0]))
                             try:
                                 for index, finding in report_csv.iterrows():
                                     # Add document from finding
                                     self.nessuselk.add_to_queue(scan, finding)
 
                             except Exception as e:
-                                self.logger.error('Nessus document creation failed: {}'.format(e))   
+                                self.logger.error('Document creation failed: {}'.format(e))   
                                 return
 
                             # When document queue is ready, push it
@@ -198,7 +200,7 @@ class scanWhispererNessus(scanWhispererBase):
                                 self.nessuselk.push_queue()
                                 
                             except Exception as e:
-                                self.logger.error('Nessus document queue push failed: {}'.format(e))  
+                                self.logger.error('Document queue push failed: {}'.format(e))  
                                 return 
 
                         else:
@@ -219,17 +221,14 @@ class scanWhispererNessus(scanWhispererBase):
                             )
                         self.record_insert(record_meta)
 
-                        self.logger.info('Scan processed successfully.')   
+                        self.logger.info('Scan processed successfully')   
 
             except Exception as e:
                 self.logger.error('Could not process new Nessus scans: {}'.format(e))
-                            
-        else:
-            self.logger.error('Failed to connect to Nessus API at {}:{}'.format(self.nessus_hostname, self.nessus_port))
 
         # Close DB connection only if not in daemon mode
         if not self.daemon:
             self.conn.close()
-            self.logger.info('Nessus module\'s job completed!')
+            self.logger.info('Module\'s job completed')
             
 

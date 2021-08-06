@@ -29,6 +29,9 @@ class BitSightELK(object):
         # Document queue
         self.document_queue = []
 
+        # Check connection
+        self.elastic_client.info()
+
         # Delete old index on Elastic Search
         self.elastic_client.indices.delete(index='scanwhisperer-bitsight',ignore=[400,404])
 

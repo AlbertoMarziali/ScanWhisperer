@@ -30,17 +30,17 @@ class scanWhispererTenableio(scanWhispererBase):
 
         super(scanWhispererTenableio, self).__init__(config=config,purge=purge)
 
-        self.develop = True
         self.purge = purge
         self.verbose = verbose
         self.daemon = daemon
+        self.ready = False
 
         # set up logger
         self.logger = logging.getLogger('scanWhispererTenableio')
         if verbose:
             self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('Starting Tenable.io module')
+        self.logger.info('Starting Module')
 
         # if the config is available
         if config is not None:
@@ -60,13 +60,12 @@ class scanWhispererTenableio(scanWhispererBase):
 
                 try:
                     # Try to connect to Tenableio
-                    self.logger.info('Attempting to connect to Tenable.io...')
+                    self.logger.info('Attempting to connect to Tenable.io')
                     self.tenableioapi = \
                         TenableioAPI(   access_key=self.access_key,
                                         secret_key=self.secret_key,
                                         verbose=verbose
                                   )
-                    self.tenableioapi_connect = True
                     self.logger.info('Connected to Tenable.io')
 
                     try:
@@ -78,8 +77,10 @@ class scanWhispererTenableio(scanWhispererBase):
                                             password=self.elk_password,
                                             verbose=verbose
                                     )
-                        self.tenableioelk_connect = True
                         self.logger.info('Connected to Elastic Search ({})'.format(self.elk_host))
+
+                        self.ready = True
+                        self.logger.info('Module Ready')
 
                     except Exception as e:
                         self.logger.error('Could not connect to Elastic Search ({}): {}'.format(self.elk_host, e))
@@ -130,7 +131,8 @@ class scanWhispererTenableio(scanWhispererBase):
 
 
     def whisper_tenableio(self):
-        if self.tenableioapi_connect and self.tenableioelk_connect:
+        # If module is ready
+        if self.ready:
             # get scan list from tenableio/tenableio, avoiding already fetched scans (if failed, throw an exception)
             try:
                 scan_list = self.get_scans_to_process(self.tenableioapi.get_scans()['scans'])
@@ -146,7 +148,7 @@ class scanWhispererTenableio(scanWhispererBase):
                     for scan in scan_list:
                         
                         # Start
-                        self.logger.info('Processing Tenable.io scan {}, (history {})'.format(scan['scan_id'], scan['history_id']))
+                        self.logger.info('Processing scan {}, (history {})'.format(scan['scan_id'], scan['history_id']))
 
                         # Download the scan report and import inside a DataFrame
                         self.logger.debug('Downloading findings...')
@@ -154,21 +156,21 @@ class scanWhispererTenableio(scanWhispererBase):
                             report_req = self.tenableioapi.download_scan(scan_id=scan['scan_id'], history=scan['history_id'], export_format='csv')
                             report_csv = pd.read_csv(io.StringIO(report_req), na_filter=False)
                         except Exception as e:
-                            self.logger.error('Tenable.io findings download failed: {}'.format(e))  
+                            self.logger.error('Findings download failed: {}'.format(e))  
                             return
 
                         # Check if the scan contains some findings
                         if len(report_csv) > 0:
 
                             # Iterate over report lines and creates documents
-                            self.logger.debug('Creating documents from {} Tenable.io findings...'.format(report_csv.shape[0]))
+                            self.logger.debug('Creating documents from {} findings...'.format(report_csv.shape[0]))
                             try:
                                 for index, finding in report_csv.iterrows():
                                     # Add document from finding
                                     self.tenableioelk.add_to_queue(scan, finding)
 
                             except Exception as e:
-                                self.logger.error('Tenable.io document creation failed: {}'.format(e))   
+                                self.logger.error('Document creation failed: {}'.format(e))   
                                 return
 
                             # When document queue is ready, push it
@@ -177,7 +179,7 @@ class scanWhispererTenableio(scanWhispererBase):
                                 self.tenableioelk.push_queue()
                                 
                             except Exception as e:
-                                self.logger.error('Tenable.io document queue push failed: {}'.format(e))  
+                                self.logger.error('Document queue push failed: {}'.format(e))  
                                 return 
 
                         else:
@@ -198,13 +200,10 @@ class scanWhispererTenableio(scanWhispererBase):
                             )
                         self.record_insert(record_meta)
 
-                        self.logger.info('Scan processed successfully.')   
+                        self.logger.info('Scan processed successfully')   
 
             except Exception as e:
-                self.logger.error('Could not process new Tenable.io scans: {}'.format(e))
-                            
-        else:
-            self.logger.error('Failed to connect to Tenable.io API')
+                self.logger.error('Could not process new scans: {}'.format(e))
         
         # Close DB connection only if not in daemon mode
         if not self.daemon:
