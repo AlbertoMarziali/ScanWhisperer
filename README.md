@@ -86,25 +86,35 @@ There are a few configuration steps to setting up ScanWhisperer:
 
 <a id="run">Run</a>
 -----
- can execute from the command line.
+You can execute from the command line:
 ```
-python scan_whisperer -c configs/frameworks.ini -s nessus 
-or
-python scan_whisperer -c configs/frameworks.ini -s awsinspector
+python3 program/scanwhisperer.py -c configs/frameworks.ini -s nessus 
 ```
-
-If no section is specified (e.g. -s nessus), scanwhisperer will check on the config file for the modules that have the property `enabled=true` and run them sequentially.
+If no section is specified (e.g. -s nessus), scanwhisperer will check on the config file for the modules that have the property `enabled=true` and run them sequentially:
+```
+python3 program/scanwhisperer.py -c configs/frameworks.ini
+```
+You can enable fancy (colorful) output:
+```
+python3 program/scanwhisperer.py -c configs/frameworks.ini -F
+```
+You can specify the log file location:
+```
+python3 program/scanwhisperer.py -c configs/frameworks.ini -l data/scanwhisperer.log 
+```
 
 (Optional) Daemon Mode
 -----
 Scan Whisperer can also be executed in daemon mode. 
 Instead of setting up a crontab job to run Scan Whisperer periodically, you can setup the systemctl daemon to have it always running. 
-To do that, have to follow those steps:
+
+To do that, you have to follow the following steps:
 1) Make sure Scan Whisperer is setup correctly (see instructions above)
 2) Create a dedicated user (scanaggregator)
 3) Copy the <a href="https://github.com/AlbertoMarziali/ScanWhisperer/blob/main/daemon/scanwhisperer.service">scanwhisperer.service file</a> into ```/etc/systemd/system```
 4) Enable the service at boot: ``` systemctl enable scanwhisperer ```
 5) Start the service ``` systemctl start scanwhisperer ```
+
 From now on, Scan Whisperer will check for new scans every minute. 
 
 Credits
