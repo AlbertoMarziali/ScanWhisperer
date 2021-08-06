@@ -212,4 +212,4 @@ class BitSightELK(object):
 
     # Clear the document queue 
     def clear_queue(self):
-        self.document_queue = {}
+        self.document_queue = []
