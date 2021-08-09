@@ -111,7 +111,7 @@ def main():
                                                 purge=args.purge,
                                                 daemon=args.daemon)
                     if sw:
-                        schedule.every(1).minutes.do(sw.whisper_tenableio)
+                        schedule.every(3).minutes.do(sw.whisper_tenableio)
 
                 elif section == 'awsinspector':
                     sw = scanWhispererAWSInspector( config=args.config,
@@ -119,7 +119,7 @@ def main():
                                                     purge=args.purge,
                                                     daemon=args.daemon)
                     if sw:
-                        schedule.every(1).minutes.do(sw.whisper_awsinspector)
+                        schedule.every(3).minutes.do(sw.whisper_awsinspector)
 
                 elif section == 'niktowrapper':
                     sw = scanWhispererNiktoWrapper( config=args.config,
@@ -133,7 +133,7 @@ def main():
                                                 verbose=args.verbose,
                                                 daemon=args.daemon)
                     if sw:
-                        schedule.every(60).minutes.do(sw.whisperer_bitsight)
+                        schedule.every(60 * 5).minutes.do(sw.whisperer_bitsight)
     
             except Exception as e:
                 logger.error("ScanWhisperer was unable to perform the processing on '{}': {}".format(section, e))
