@@ -138,7 +138,7 @@ class scanWhispererNessus(scanWhispererBase):
         if self.ready:
             # get scan list from nessus/tenableio, avoiding already fetched scans (if failed, throw an exception)
             try:
-                scan_list = self.get_scans_to_process(self.nessusapi.get_scans().get('scans', []))
+                scan_list = self.get_scans_to_process(self.nessusapi.get_scans())
 
                 # if no scans are available, just exit
                 if not scan_list:

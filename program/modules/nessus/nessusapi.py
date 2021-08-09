@@ -82,10 +82,18 @@ class NessusAPI(object):
     def check(self):
         self.request('/session', method='GET', json_output=True)
 
+    
+    def get_folder_ids_by_type(self, type):
+        folders = self.request('/folders', method='GET', json_output=True).get('folders', [])
+        return [folder.get('id') for folder in folders if folder.get('type') == type]
 
-    def get_scans(self):
-        scans = self.request('/scans', method='GET', json_output=True)
-        return scans
+
+    def get_scans(self, include_trash = False):
+        scans = self.request('/scans', method='GET', json_output=True).get('scans', [])
+        if include_trash:
+            return scans
+        else:
+            return [scan for scan in scans if scan.get('folder_id', []) not in self.get_folder_ids_by_type('trash')]
 
 
     def get_scan_history(self, scan_id):
