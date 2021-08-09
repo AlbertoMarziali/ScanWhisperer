@@ -35,6 +35,9 @@ class BitSightELK(object):
         # Check connection
         self.elastic_client.info()
 
+       
+    # Clear Index
+    def clear_index(self):
         # Delete old index on Elastic Search
         self.elastic_client.indices.delete(index='scanwhisperer-bitsight',ignore=[400,404])
 

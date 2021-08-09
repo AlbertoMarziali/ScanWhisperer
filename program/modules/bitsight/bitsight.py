@@ -86,6 +86,9 @@ class scanWhispererBitSight(scanWhispererBase):
         if self.ready:
             # Update all reports
             try:
+                # Clear Elastic Search index
+                self.bitsightelk.clear_index()
+
                 # Get companies via API
                 for company in self.bitsightapi.get_companies():
 
