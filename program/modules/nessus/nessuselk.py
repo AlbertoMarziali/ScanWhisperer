@@ -155,7 +155,9 @@ class NessusELK(object):
                             "cve.cvss3.temporal.score": {
                                 "type": "float" 
                             },
-
+                            "asset.ip": {
+                                "type": "ip" 
+                            }
                         }
                     }
                 }

@@ -151,6 +151,9 @@ class AWSInspectorELK(object):
                             },
                             "cve.cvss3.score": {
                                 "type": "float" 
+                            },
+                            "asset.ip": {
+                                "type": "ip" 
                             }
                         }
                     }

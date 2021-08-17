@@ -227,7 +227,7 @@ class scanWhispererNessus(scanWhispererBase):
                         self.logger.info('Scan processed successfully')   
 
             except Exception as e:
-                self.logger.error('Could not process new Nessus scans: {}'.format(e))
+                self.logger.error('Could not process new scans: {}'.format(e))
 
         # Close DB connection only if not in daemon mode
         if not self.daemon:

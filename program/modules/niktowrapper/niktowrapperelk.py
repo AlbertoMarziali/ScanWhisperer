@@ -107,6 +107,9 @@ class NiktoWrapperELK(object):
                             },
                             "asset.geo.location": {
                                 "type": "geo_point" 
+                            },
+                            "asset.ip": {
+                                "type": "ip" 
                             }
                         }
                     }
