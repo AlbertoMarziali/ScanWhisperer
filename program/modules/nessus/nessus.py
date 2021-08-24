@@ -4,7 +4,7 @@ from __future__ import absolute_import
 
 __author__ = 'Alberto Marziali'
 
-from base.base import scanWhispererBase
+from common.base import scanWhispererBase
 from modules.nessus.nessusapi import NessusAPI
 from modules.nessus.nessuselk import NessusELK
 

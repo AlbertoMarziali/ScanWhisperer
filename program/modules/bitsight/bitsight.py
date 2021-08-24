@@ -4,7 +4,7 @@ from __future__ import absolute_import
 
 __author__ = 'Alberto Marziali'
 
-from base.base import scanWhispererBase
+from common.base import scanWhispererBase
 from modules.bitsight.bitsightapi import BitSightAPI
 from modules.bitsight.bitsightelk import BitSightELK
 

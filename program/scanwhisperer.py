@@ -11,7 +11,7 @@ import schedule
 import time
 
 # Common
-from base.config import swConfig
+from common.config import swConfig
 
 # Modules
 from modules.nessus.nessus import scanWhispererNessus
