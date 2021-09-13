@@ -71,14 +71,7 @@ class TenableioAPI(object):
             return response.json()
         if download:
             self.logger.debug('Returning data.content')
-            response_data = ''
-            count = 0
-            for chunk in response.iter_content(chunk_size=8192):
-                count += 1
-                if chunk:
-                    response_data += chunk.decode("utf-8")
-            self.logger.debug('Processed {} chunks'.format(count))
-            return response_data
+            return response.content.decode("utf-8")
         return response
 
 

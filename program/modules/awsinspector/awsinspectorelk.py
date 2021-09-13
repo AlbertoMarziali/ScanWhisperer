@@ -89,7 +89,7 @@ class AWSInspectorELK(object):
         self.add_field_to_document(document, 'finding.first_observed', finding.get('updatedAt', datetime.utcnow()).isoformat())
         self.add_field_to_document(document, 'finding.last_observed', finding.get('updatedAt', datetime.utcnow()).isoformat())
         # guess finding type by existing fields
-        if document.get('cve.id'):
+        if document.get('cve.cvss.score'):
             self.add_field_to_document(document, 'finding.type', 'cve')
         elif document.get('cis.benchmark'):
             self.add_field_to_document(document, 'finding.type', 'cis')
